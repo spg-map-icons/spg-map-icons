@@ -1,0 +1,803 @@
+{
+ "version": 1,
+ "maj_le": "2026-10-23",
+ "note": "Source unique des préréglages : lu par l'éditeur et par RFP-08 (Fetch Map Presets). Quotas = nombre maximal par catégorie, dans l'ordre de priorité.",
+ "mode_defaut": "bureaux",
+ "categories": [
+  {
+   "cle": "autoroute",
+   "libelle": "Autoroute",
+   "icone": "autoroute",
+   "source": "osm"
+  },
+  {
+   "cle": "tram",
+   "libelle": "Tram et métro",
+   "icone": "tram",
+   "source": "osm"
+  },
+  {
+   "cle": "gare",
+   "libelle": "Gare",
+   "icone": "gare",
+   "source": "searchbox",
+   "searchbox": "railway_station"
+  },
+  {
+   "cle": "bus",
+   "libelle": "Arrêts de bus",
+   "icone": "bus",
+   "source": "searchbox",
+   "searchbox": "bus_station"
+  },
+  {
+   "cle": "parking",
+   "libelle": "Parkings",
+   "icone": "parking",
+   "source": "searchbox",
+   "searchbox": "parking_lot"
+  },
+  {
+   "cle": "commerce",
+   "libelle": "Supermarchés",
+   "icone": "commerce",
+   "source": "searchbox",
+   "searchbox": "grocery"
+  },
+  {
+   "cle": "restaurant",
+   "libelle": "Restaurants",
+   "icone": "restaurant",
+   "source": "searchbox",
+   "searchbox": "restaurant"
+  },
+  {
+   "cle": "ecole",
+   "libelle": "Écoles",
+   "icone": "ecole",
+   "source": "searchbox",
+   "searchbox": "school"
+  },
+  {
+   "cle": "sante",
+   "libelle": "Pharmacies",
+   "icone": "sante",
+   "source": "searchbox",
+   "searchbox": "pharmacy"
+  },
+  {
+   "cle": "hopital",
+   "libelle": "Hôpitaux",
+   "icone": "hopital",
+   "source": "searchbox",
+   "searchbox": "hospital"
+  },
+  {
+   "cle": "fitness",
+   "libelle": "Sport et fitness",
+   "icone": "fitness",
+   "source": "searchbox",
+   "searchbox": "fitness_center"
+  },
+  {
+   "cle": "piscine",
+   "libelle": "Piscines",
+   "icone": "piscine",
+   "source": "searchbox",
+   "searchbox": "swimming_pool"
+  },
+  {
+   "cle": "parc",
+   "libelle": "Parcs",
+   "icone": "parc",
+   "source": "searchbox",
+   "searchbox": "park"
+  },
+  {
+   "cle": "station_service",
+   "libelle": "Stations-service",
+   "icone": "station_service",
+   "source": "searchbox",
+   "searchbox": "gas_station"
+  },
+  {
+   "cle": "hotel",
+   "libelle": "Hôtels",
+   "icone": "hotel",
+   "source": "searchbox",
+   "searchbox": "hotel"
+  },
+  {
+   "cle": "bar",
+   "libelle": "Bars",
+   "icone": "bar",
+   "source": "searchbox",
+   "searchbox": "bar"
+  }
+ ],
+ "modes": {
+  "residentiel": {
+   "libelle": "Résidentiel",
+   "rayon_m": 800,
+   "max_pois": 30,
+   "quotas": {
+    "gare": 1,
+    "tram": 2,
+    "bus": 3,
+    "commerce": 3,
+    "ecole": 3,
+    "restaurant": 5,
+    "sante": 2,
+    "hopital": 1,
+    "fitness": 2,
+    "parc": 2,
+    "parking": 1,
+    "piscine": 1,
+    "autoroute": 1
+   }
+  },
+  "bureaux": {
+   "libelle": "Bureaux",
+   "rayon_m": 550,
+   "max_pois": 30,
+   "quotas": {
+    "autoroute": 1,
+    "gare": 1,
+    "tram": 2,
+    "bus": 3,
+    "parking": 2,
+    "restaurant": 4,
+    "hotel": 2,
+    "commerce": 2,
+    "fitness": 1,
+    "sante": 1,
+    "parc": 1,
+    "ecole": 1,
+    "hopital": 1
+   }
+  },
+  "commercial": {
+   "libelle": "Commercial",
+   "rayon_m": 700,
+   "max_pois": 24,
+   "quotas": {
+    "autoroute": 1,
+    "gare": 1,
+    "tram": 2,
+    "bus": 3,
+    "parking": 2,
+    "restaurant": 3,
+    "commerce": 2,
+    "fitness": 1,
+    "station_service": 1,
+    "sante": 1
+   }
+  },
+  "industriel": {
+   "libelle": "Industriel",
+   "rayon_m": 1000,
+   "max_pois": 18,
+   "quotas": {
+    "autoroute": 1,
+    "station_service": 2,
+    "gare": 1,
+    "bus": 2,
+    "tram": 1,
+    "parking": 1,
+    "restaurant": 3,
+    "commerce": 1,
+    "fitness": 1,
+    "sante": 1
+   }
+  }
+ },
+ "type_vers_mode": [
+  [
+   "industr|logist|artisan|d[ée]p[oô]t|atelier|stockage",
+   "industriel"
+  ],
+  [
+   "commerc|retail|arcade|magasin|boutique|vente",
+   "commercial"
+  ],
+  [
+   "r[ée]sid|logement|habitat|appartement|ppe",
+   "residentiel"
+  ],
+  [
+   "bureau|office|administrat|laborat|cabinet|mixte",
+   "bureaux"
+  ]
+ ],
+ "references": {
+  "residentiel": [
+   "residentiel",
+   "mixte"
+  ],
+  "bureaux": [
+   "bureaux",
+   "commercial",
+   "industriel",
+   "logistique",
+   "mixte"
+  ],
+  "commercial": [
+   "bureaux",
+   "commercial",
+   "industriel",
+   "logistique",
+   "mixte"
+  ],
+  "industriel": [
+   "bureaux",
+   "commercial",
+   "industriel",
+   "logistique",
+   "mixte"
+  ]
+ },
+ "palette": [
+  {
+   "icone": "gare",
+   "libelle": "Gare",
+   "groupe": "Icônes"
+  },
+  {
+   "icone": "tram",
+   "libelle": "Tram et métro",
+   "groupe": "Icônes"
+  },
+  {
+   "icone": "bus",
+   "libelle": "Arrêts de bus",
+   "groupe": "Icônes"
+  },
+  {
+   "icone": "autoroute",
+   "libelle": "Autoroute",
+   "groupe": "Icônes"
+  },
+  {
+   "icone": "parking",
+   "libelle": "Parkings",
+   "groupe": "Icônes"
+  },
+  {
+   "icone": "commerce",
+   "libelle": "Supermarchés",
+   "groupe": "Icônes"
+  },
+  {
+   "icone": "restaurant",
+   "libelle": "Restaurants",
+   "groupe": "Icônes"
+  },
+  {
+   "icone": "bar",
+   "libelle": "Bar",
+   "groupe": "Icônes"
+  },
+  {
+   "icone": "hotel",
+   "libelle": "Hôtel",
+   "groupe": "Icônes"
+  },
+  {
+   "icone": "ecole",
+   "libelle": "Écoles",
+   "groupe": "Icônes"
+  },
+  {
+   "icone": "sante",
+   "libelle": "Pharmacies",
+   "groupe": "Icônes"
+  },
+  {
+   "icone": "hopital",
+   "libelle": "Hôpitaux",
+   "groupe": "Icônes"
+  },
+  {
+   "icone": "fitness",
+   "libelle": "Sport et fitness",
+   "groupe": "Icônes"
+  },
+  {
+   "icone": "piscine",
+   "libelle": "Piscines",
+   "groupe": "Icônes"
+  },
+  {
+   "icone": "stade",
+   "libelle": "Stade",
+   "groupe": "Icônes"
+  },
+  {
+   "icone": "parc",
+   "libelle": "Parcs",
+   "groupe": "Icônes"
+  },
+  {
+   "icone": "station_service",
+   "libelle": "Stations-service",
+   "groupe": "Icônes"
+  },
+  {
+   "icone": "banque",
+   "libelle": "Banque",
+   "groupe": "Icônes"
+  },
+  {
+   "icone": "port",
+   "libelle": "Port",
+   "groupe": "Icônes"
+  },
+  {
+   "icone": "aeroport",
+   "libelle": "Aéroport",
+   "groupe": "Icônes"
+  },
+  {
+   "icone": "industrie",
+   "libelle": "Zone industrielle",
+   "groupe": "Icônes"
+  },
+  {
+   "icone": "ref_vendu",
+   "libelle": "Property sold",
+   "groupe": "Références"
+  },
+  {
+   "icone": "ref_advisory",
+   "libelle": "Advisory",
+   "groupe": "Références"
+  },
+  {
+   "icone": "ref_letting",
+   "libelle": "Letting",
+   "groupe": "Références"
+  }
+ ],
+ "logos": [
+  {
+   "fichier": "logo-aldi.svg",
+   "libelle": "Aldi",
+   "groupe": "Commerce"
+  },
+  {
+   "fichier": "logo-aligro.svg",
+   "libelle": "Aligro",
+   "groupe": "Commerce"
+  },
+  {
+   "fichier": "logo-coop.svg",
+   "libelle": "Coop",
+   "groupe": "Commerce"
+  },
+  {
+   "fichier": "logo-coop-city.png",
+   "libelle": "Coop City",
+   "groupe": "Commerce"
+  },
+  {
+   "fichier": "logo-coop-pronto.svg",
+   "libelle": "Coop Pronto",
+   "groupe": "Commerce"
+  },
+  {
+   "fichier": "logo-denner.svg",
+   "libelle": "Denner",
+   "groupe": "Commerce"
+  },
+  {
+   "fichier": "logo-globus.jpg",
+   "libelle": "Globus",
+   "groupe": "Commerce"
+  },
+  {
+   "fichier": "logo-ikea.svg",
+   "libelle": "IKEA",
+   "groupe": "Commerce"
+  },
+  {
+   "fichier": "logo-landi.svg",
+   "libelle": "Landi",
+   "groupe": "Commerce"
+  },
+  {
+   "fichier": "logo-lidl.svg",
+   "libelle": "Lidl",
+   "groupe": "Commerce"
+  },
+  {
+   "fichier": "logo-manor.svg",
+   "libelle": "Manor",
+   "groupe": "Commerce"
+  },
+  {
+   "fichier": "logo-migrolino.jpeg",
+   "libelle": "Migrolino",
+   "groupe": "Commerce"
+  },
+  {
+   "fichier": "logo-migros.svg",
+   "libelle": "Migros",
+   "groupe": "Commerce"
+  },
+  {
+   "fichier": "logo-volg.jpeg",
+   "libelle": "Volg",
+   "groupe": "Commerce"
+  },
+  {
+   "fichier": "logo-amavita.svg",
+   "libelle": "Amavita",
+   "groupe": "Pharmacie"
+  },
+  {
+   "fichier": "logo-benu.svg",
+   "libelle": "Benu",
+   "groupe": "Pharmacie"
+  },
+  {
+   "fichier": "logo-coop-vitality.svg",
+   "libelle": "Coop Vitality",
+   "groupe": "Pharmacie"
+  },
+  {
+   "fichier": "logo-pharmacie-principale.jpg",
+   "libelle": "Pharmacie Principale",
+   "groupe": "Pharmacie"
+  },
+  {
+   "fichier": "logo-sunstore.svg",
+   "libelle": "Sun Store",
+   "groupe": "Pharmacie"
+  },
+  {
+   "fichier": "logo-toppharm.svg",
+   "libelle": "TopPharm",
+   "groupe": "Pharmacie"
+  },
+  {
+   "fichier": "logo-chuv.jpeg",
+   "libelle": "CHUV",
+   "groupe": "Santé"
+  },
+  {
+   "fichier": "logo-claraspital.png",
+   "libelle": "Claraspital",
+   "groupe": "Santé"
+  },
+  {
+   "fichier": "logo-la-source.png",
+   "libelle": "Clinique de La Source",
+   "groupe": "Santé"
+  },
+  {
+   "fichier": "logo-ehnv.jpeg",
+   "libelle": "eHnv – Hôpital d'Yverdon",
+   "groupe": "Santé"
+  },
+  {
+   "fichier": "logo-ehc.svg",
+   "libelle": "Ensemble Hospitalier de la Côte (Hôpital de Morges)",
+   "groupe": "Santé"
+  },
+  {
+   "fichier": "logo-ghol.jpeg",
+   "libelle": "GHOL – Hôpital de Nyon",
+   "groupe": "Santé"
+  },
+  {
+   "fichier": "logo-hirslanden.jpeg",
+   "libelle": "Hirslanden (Grangettes, La Colline, Bois-Cerf, Cecil)",
+   "groupe": "Santé"
+  },
+  {
+   "fichier": "logo-hug.jpeg",
+   "libelle": "HUG – Hôpitaux universitaires de Genève",
+   "groupe": "Santé"
+  },
+  {
+   "fichier": "logo-hopital-de-la-tour.jpeg",
+   "libelle": "Hôpital de la Tour",
+   "groupe": "Santé"
+  },
+  {
+   "fichier": "logo-hrc.jpeg",
+   "libelle": "Hôpital Riviera-Chablais (HRC)",
+   "groupe": "Santé"
+  },
+  {
+   "fichier": "logo-kispi.svg",
+   "libelle": "Kinderspital Zürich",
+   "groupe": "Santé"
+  },
+  {
+   "fichier": "logo-stadtspital-zuerich.svg",
+   "libelle": "Stadtspital Zürich (Triemli, Waid)",
+   "groupe": "Santé"
+  },
+  {
+   "fichier": "logo-swiss-medical-network.svg",
+   "libelle": "Swiss Medical Network (Générale-Beaulieu, Genolier…)",
+   "groupe": "Santé"
+  },
+  {
+   "fichier": "logo-ukbb.jpeg",
+   "libelle": "UKBB – hôpital pédiatrique de Bâle",
+   "groupe": "Santé"
+  },
+  {
+   "fichier": "logo-usb.png",
+   "libelle": "Universitätsspital Basel (USB)",
+   "groupe": "Santé"
+  },
+  {
+   "fichier": "logo-activ-fitness.svg",
+   "libelle": "Activ Fitness",
+   "groupe": "Sport"
+  },
+  {
+   "fichier": "logo-holmes-place.jpeg",
+   "libelle": "Holmes Place",
+   "groupe": "Sport"
+  },
+  {
+   "fichier": "logo-kieser.jpeg",
+   "libelle": "Kieser Training",
+   "groupe": "Sport"
+  },
+  {
+   "fichier": "logo-letsgo.svg",
+   "libelle": "Let's Go Fitness",
+   "groupe": "Sport"
+  },
+  {
+   "fichier": "logo-update-fitness.jpeg",
+   "libelle": "Update Fitness",
+   "groupe": "Sport"
+  },
+  {
+   "fichier": "logo-agrola.png",
+   "libelle": "Agrola",
+   "groupe": "Station-service"
+  },
+  {
+   "fichier": "logo-avia.svg",
+   "libelle": "Avia",
+   "groupe": "Station-service"
+  },
+  {
+   "fichier": "logo-bp.svg",
+   "libelle": "BP",
+   "groupe": "Station-service"
+  },
+  {
+   "fichier": "logo-eni.svg",
+   "libelle": "Eni",
+   "groupe": "Station-service"
+  },
+  {
+   "fichier": "logo-migrol.svg",
+   "libelle": "Migrol",
+   "groupe": "Station-service"
+  },
+  {
+   "fichier": "logo-shell.svg",
+   "libelle": "Shell",
+   "groupe": "Station-service"
+  },
+  {
+   "fichier": "logo-socar.png",
+   "libelle": "Socar",
+   "groupe": "Station-service"
+  },
+  {
+   "fichier": "logo-tamoil.svg",
+   "libelle": "Tamoil",
+   "groupe": "Station-service"
+  },
+  {
+   "fichier": "logo-flughafen-zuerich.svg",
+   "libelle": "Aéroport de Zurich",
+   "groupe": "Transport"
+  },
+  {
+   "fichier": "logo-bvb.svg",
+   "libelle": "BVB – transports de Bâle",
+   "groupe": "Transport"
+  },
+  {
+   "fichier": "logo-cff.svg",
+   "libelle": "CFF – gares",
+   "groupe": "Transport"
+  },
+  {
+   "fichier": "logo-cgn.jpeg",
+   "libelle": "CGN – bateaux du Léman",
+   "groupe": "Transport"
+  },
+  {
+   "fichier": "logo-euroairport.svg",
+   "libelle": "EuroAirport Bâle-Mulhouse",
+   "groupe": "Transport"
+  },
+  {
+   "fichier": "logo-geneve-aeroport.svg",
+   "libelle": "Genève Aéroport",
+   "groupe": "Transport"
+  },
+  {
+   "fichier": "logo-leman-express.svg",
+   "libelle": "Léman Express",
+   "groupe": "Transport"
+  },
+  {
+   "fichier": "logo-tl.svg",
+   "libelle": "tl – transports lausannois",
+   "groupe": "Transport"
+  },
+  {
+   "fichier": "logo-tpg.svg",
+   "libelle": "tpg – bus, trams, mouettes",
+   "groupe": "Transport"
+  },
+  {
+   "fichier": "logo-vbz.svg",
+   "libelle": "VBZ – transports de Zurich",
+   "groupe": "Transport"
+  },
+  {
+   "fichier": "logo-aiglon.png",
+   "libelle": "Aiglon College",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-brillantmont.svg",
+   "libelle": "Brillantmont International School",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-champittet.png",
+   "libelle": "Collège Champittet",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-college-du-leman.png",
+   "libelle": "Collège du Léman",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-ecal.png",
+   "libelle": "ECAL",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-ecolint.png",
+   "libelle": "Ecolint – École internationale de Genève",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-ehl.png",
+   "libelle": "EHL Hospitality Business School",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-epfl.svg",
+   "libelle": "EPFL",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-eth.svg",
+   "libelle": "ETH Zürich",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-fhnw.svg",
+   "libelle": "FHNW",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-iheid.png",
+   "libelle": "Geneva Graduate Institute (IHEID)",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-head.jpg",
+   "libelle": "HEAD – Genève",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-heg-geneve.png",
+   "libelle": "HEG Genève – Haute école de gestion",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-heig-vd.jpeg",
+   "libelle": "HEIG-VD",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-hemu.png",
+   "libelle": "HEMU – Haute école de musique",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-hep-vaud.svg",
+   "libelle": "HEP Vaud",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-hepia.png",
+   "libelle": "HEPIA",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-imd.svg",
+   "libelle": "IMD",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-florimont.svg",
+   "libelle": "Institut Florimont",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-le-rosey.png",
+   "libelle": "Institut Le Rosey",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-isb.jpeg",
+   "libelle": "International School Basel",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-isl.png",
+   "libelle": "International School of Lausanne",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-unibas.png",
+   "libelle": "Universität Basel",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-uzh.svg",
+   "libelle": "Universität Zürich (UZH)",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-unige.svg",
+   "libelle": "Université de Genève (UNIGE)",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-unil.png",
+   "libelle": "Université de Lausanne (UNIL)",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-webster.png",
+   "libelle": "Webster University Geneva",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-zhaw.svg",
+   "libelle": "ZHAW",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-zhdk.png",
+   "libelle": "ZHdK – Zürcher Hochschule der Künste",
+   "groupe": "Éducation"
+  },
+  {
+   "fichier": "logo-zis.svg",
+   "libelle": "Zurich International School",
+   "groupe": "Éducation"
+  }
+ ]
+}
