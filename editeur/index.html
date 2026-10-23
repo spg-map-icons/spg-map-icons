@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<!-- Envoie l'URL complète (sans le #fragment) dans le Referer : nécessaire pour la restriction d'URL du token Mapbox à .../spg-map-icons/ -->
+<!-- Referer complet (sans #fragment) vers Mapbox : compatible avec une restriction d'URL du token. -->
 <meta name="referrer" content="no-referrer-when-downgrade">
 <title>Carte du bien · éditeur</title>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.31.0/mapbox-gl.css" rel="stylesheet">
@@ -11,113 +11,179 @@
 <style>
   :root {
     --bleu: #003B5C; --rouge: #E4002B; --gris-fonce: #1D1F29; --gris: #545859;
-    --fond: #F3F5F7; --carte: #FFFFFF; --ligne: #D9DEE3; --texte: #1D1F29; --doux: #6B7177;
-    --ok: #2E7D4F; --alerte: #B54708;
-    --rayon: 8px;
-    --cadre: 760px;
+    --fond: #EDF0F3; --carte: #FFFFFF; --ligne: #DDE2E7; --texte: #1D1F29; --doux: #6B7177;
+    --ok: #2E7D4F; --alerte: #B54708; --survol: #F2F5F8; --pied: #FAFBFC;
+    --entete: 56px; --g: 284px; --d: 312px;
+    --cadre: 760px;   /* taille affichée du cadre (calculée) */
+    --k: 1;           /* échelle d'affichage : la carte reste 760 × 760 px CSS, comme l'export */
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; }
   body {
-    font: 14px/1.4 Aptos, "Segoe UI", system-ui, -apple-system, sans-serif;
+    font: 13.5px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     color: var(--texte); background: var(--fond);
-    display: grid; grid-template-rows: auto 1fr; min-width: 1180px;
+    display: grid; grid-template-rows: var(--entete) minmax(0, 1fr); overflow: hidden;
   }
-  header {
-    background: var(--bleu); color: #fff; display: flex; align-items: center; gap: 16px;
-    padding: 10px 20px;
-  }
-  header h1 { font-size: 17px; font-weight: 600; margin: 0; }
-  header .marque { font-size: 13px; opacity: .8; }
-  header .espace { flex: 1; }
-  header .qui { font-size: 13px; opacity: .9; }
-  header button.lien { color: #fff; border-color: rgba(255,255,255,.45); background: transparent; }
-
-  main { display: grid; grid-template-columns: 360px 1fr; min-height: 0; }
-  aside {
-    background: var(--carte); border-right: 1px solid var(--ligne); overflow-y: auto;
-    padding: 16px; display: flex; flex-direction: column; gap: 18px;
-  }
-  section h2 {
-    font-size: 12px; font-weight: 600; letter-spacing: .02em; color: var(--doux);
-    margin: 0 0 8px; text-transform: none;
-  }
-  label { display: block; font-size: 12px; color: var(--gris); margin: 8px 0 4px; }
+  [hidden] { display: none !important; }
+  h2 { font-size: 12px; font-weight: 600; letter-spacing: .02em; color: var(--doux); margin: 0 0 8px; }
+  label { display: block; font-size: 12px; color: var(--gris); margin: 10px 0 4px; }
   input[type=text], input[type=password], select, input[type=number] {
-    width: 100%; font: inherit; padding: 7px 9px; border: 1px solid var(--ligne); border-radius: 6px;
+    width: 100%; font: inherit; height: 32px; padding: 0 9px; border: 1px solid var(--ligne); border-radius: 6px;
     background: #fff; color: var(--texte);
   }
-  input:focus, select:focus, button:focus-visible { outline: 2px solid var(--bleu); outline-offset: 1px; }
-  .rangee { display: flex; gap: 8px; align-items: center; }
-  .rangee > * { min-width: 0; }
+  input:focus-visible, select:focus-visible, button:focus-visible, .pal:focus-visible, summary:focus-visible { outline: 2px solid var(--bleu); outline-offset: 1px; }
   button {
-    font: inherit; border: 1px solid var(--ligne); background: #fff; color: var(--texte);
-    border-radius: 6px; padding: 7px 12px; cursor: pointer; white-space: nowrap;
+    font: inherit; height: 32px; border: 1px solid var(--ligne); background: #fff; color: var(--texte);
+    border-radius: 6px; padding: 0 12px; cursor: pointer; white-space: nowrap;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    transition: background-color .12s, border-color .12s, color .12s;
   }
   button:hover:not(:disabled) { border-color: var(--bleu); }
-  button:disabled { opacity: .45; cursor: default; }
+  button:disabled { opacity: .42; cursor: default; }
   button.primaire { background: var(--rouge); border-color: var(--rouge); color: #fff; font-weight: 600; }
   button.primaire:hover:not(:disabled) { background: #c10025; border-color: #c10025; }
   button.secondaire { background: var(--bleu); border-color: var(--bleu); color: #fff; }
+  button.secondaire:hover:not(:disabled) { background: #00304b; }
   button.danger { color: var(--rouge); }
+  button.carre { width: 32px; padding: 0; }
+  .ico { width: 17px; height: 17px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
   .aide { font-size: 12px; color: var(--doux); margin: 6px 0 0; }
+  .case { display: flex; gap: 7px; align-items: center; margin: 0; font-size: 12.5px; color: var(--texte); cursor: pointer; }
+  kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--ligne); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: #fff; }
 
-  #resultats { list-style: none; margin: 4px 0 0; padding: 0; border: 1px solid var(--ligne); border-radius: 6px; display: none; }
-  #resultats li { padding: 7px 9px; cursor: pointer; border-top: 1px solid var(--ligne); }
-  #resultats li:first-child { border-top: 0; }
+  /* ---------- en-tête : ce qu'on édite ---------- */
+  .entete {
+    background: var(--bleu); color: #fff; display: flex; align-items: center; gap: 10px;
+    padding: 0 14px; min-width: 0; position: relative; z-index: 30;
+  }
+  .marque { display: flex; flex-direction: column; line-height: 1.15; white-space: nowrap; margin-right: 4px; }
+  .marque strong { font-size: 15px; font-weight: 600; }
+  .marque span { font-size: 11px; opacity: .7; }
+  .entete .groupe { display: flex; gap: 6px; align-items: center; min-width: 0; }
+  .entete input, .entete select { height: 34px; border-color: transparent; }
+  .entete button { height: 34px; }
+  #rfp { width: 150px; text-transform: uppercase; }
+  #langue { width: 64px; }
+  .champ-adresse { position: relative; flex: 1 1 360px; max-width: 600px; }
+  .champ-adresse input { flex: 1; }
+  .entete button.fantome { background: rgba(255,255,255,.14); color: #fff; border-color: transparent; }
+  .entete button.fantome:hover:not(:disabled) { background: rgba(255,255,255,.24); }
+  .entete .espace { flex: 1; }
+  .entete .qui { font-size: 12px; opacity: .85; white-space: nowrap; }
+  .entete button.lien { color: #fff; background: transparent; border-color: rgba(255,255,255,.4); }
+  #resultats {
+    list-style: none; margin: 0; padding: 4px 0; position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+    background: #fff; color: var(--texte); border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.22); display: none; z-index: 40;
+  }
+  #resultats li { padding: 8px 12px; cursor: pointer; }
   #resultats li:hover, #resultats li.actif { background: #EEF3F7; }
-  #lieu { font-size: 12px; color: var(--ok); margin-top: 6px; min-height: 16px; }
+
+  /* ---------- trois colonnes ---------- */
+  .app { display: grid; grid-template-columns: var(--g) minmax(0, 1fr) var(--d); min-height: 0; }
+  .panneau { background: var(--carte); min-height: 0; display: flex; flex-direction: column; }
+  .gauche { border-right: 1px solid var(--ligne); }
+  .droite { border-left: 1px solid var(--ligne); }
+  .panneau-corps { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 16px; }
+  .panneau-pied { border-top: 1px solid var(--ligne); padding: 12px 16px; background: var(--pied); display: flex; flex-direction: column; gap: 8px; }
+  .panneau-pied .aide { margin: 0; }
+  #btnPreremplir { width: 100%; height: 36px; }
 
   .curseur { display: flex; align-items: center; gap: 10px; }
   .curseur input { flex: 1; }
-  .curseur output { width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
+  .curseur output { width: 60px; text-align: right; font-variant-numeric: tabular-nums; }
+  .titre-cat { display: flex; justify-content: space-between; font-size: 12px; color: var(--gris); margin: 14px 0 4px; }
+  #categories { display: flex; flex-direction: column; }
+  .cat { display: grid; grid-template-columns: 18px 22px minmax(0, 1fr) 52px; align-items: center; gap: 8px; padding: 2px 4px; border-radius: 6px; margin: 0; color: var(--texte); font-size: 13px; cursor: pointer; }
+  .cat:hover { background: var(--survol); }
+  .cat img { width: 22px; height: 22px; object-fit: contain; }
+  .cat span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cat input[type=number] { height: 26px; padding: 0 6px; text-align: right; }
+  .cat.off span, .cat.off img { opacity: .45; }
 
-  #categories { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
-  .cat { display: grid; grid-template-columns: 20px 26px 1fr 56px; align-items: center; gap: 8px; padding: 3px 4px; border-radius: 6px; }
-  .cat:hover { background: #F5F7F9; }
-  .cat img { width: 24px; height: 24px; object-fit: contain; }
-  .cat input[type=number] { padding: 3px 6px; text-align: right; }
-  .cat.off span { color: var(--doux); }
+  /* Sélection (haut de la colonne droite, toujours visible) */
+  .bloc-selection { padding: 14px 16px; border-bottom: 1px solid var(--ligne); min-height: 128px; }
+  #selContenu .vide { color: var(--doux); font-size: 12.5px; margin: 0; }
+  .sel-tete { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; min-width: 0; }
+  .sel-tete img { width: 36px; height: 36px; object-fit: contain; flex: none; border: 1px solid var(--ligne); border-radius: 6px; padding: 3px; background: #fff; }
+  .sel-tete strong { display: block; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sel-tete small { color: var(--doux); }
+  .sel-tete > div { min-width: 0; }
+  #selContenu dl { display: grid; grid-template-columns: 92px 1fr; gap: 3px 8px; margin: 0 0 10px; font-size: 12.5px; }
+  #selContenu dt { color: var(--doux); }
+  #selContenu dd { margin: 0; overflow-wrap: anywhere; }
+  #selContenu .actions { display: flex; flex-wrap: wrap; gap: 6px; }
 
-  .groupe-pal { font-size: 12px; color: var(--doux); margin: 10px 0 6px; }
+  /* Palette */
+  .onglets { display: flex; gap: 4px; padding: 10px 16px 0; border-bottom: 1px solid var(--ligne); }
+  .onglets button { height: 32px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: none; color: var(--doux); padding: 0 8px; font-weight: 600; }
+  .onglets button[aria-selected=true] { color: var(--bleu); border-bottom-color: var(--rouge); }
+  .onglets .nb { font-weight: 400; font-size: 11px; color: var(--doux); }
+  .groupe-pal { font-size: 12px; color: var(--doux); margin: 12px 0 6px; }
+  .groupe-pal:first-child { margin-top: 0; }
   .grille-pal { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
-  .grille-pal.logos { grid-template-columns: repeat(4, minmax(0, 1fr)); max-height: 260px; overflow-y: auto; padding: 2px; }
+  .grille-pal.logos { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .pal {
     aspect-ratio: 1; border: 1px solid var(--ligne); border-radius: 6px; background: #fff;
     display: block; position: relative; padding: 4px; cursor: grab; min-width: 0; overflow: hidden;
+    transition: border-color .12s, box-shadow .12s, transform .12s;
   }
+  .pal:hover { border-color: var(--bleu); transform: translateY(-1px); }
   .grille-pal.logos .pal { aspect-ratio: 3 / 2; }
+  .grille-pal.refs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .grille-pal.refs .pal { aspect-ratio: 7 / 5; }
   .pal img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
   .pal.arme { border-color: var(--rouge); box-shadow: 0 0 0 2px var(--rouge) inset; }
   .pal.absente { opacity: .35; }
-  .pal[hidden] { display: none; }
-  #filtreLogos { margin-bottom: 6px; }
+  .recherche-logos { position: sticky; top: -14px; background: var(--carte); padding: 0 0 8px; margin-top: -2px; z-index: 1; }
+  details.raccourcis summary { cursor: pointer; font-size: 12px; color: var(--doux); }
+  details.raccourcis p { margin: 6px 0 0; }
 
-  #selection .vide { color: var(--doux); font-size: 13px; }
-  #selection dl { display: grid; grid-template-columns: 80px 1fr; gap: 4px 8px; margin: 0 0 10px; font-size: 13px; }
-  #selection dt { color: var(--doux); }
-  #selection dd { margin: 0; overflow-wrap: anywhere; }
-  #selection .actions { display: flex; flex-wrap: wrap; gap: 6px; }
-
-  .scene { overflow: auto; padding: 18px 24px 28px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
-  .barre { display: flex; gap: 8px; align-items: center; width: var(--cadre); }
+  /* ---------- scène centrale ---------- */
+  .scene { display: flex; flex-direction: column; align-items: center; min-width: 0; min-height: 0; padding: 12px 16px 10px; gap: 8px; }
+  #bandeau { display: none; width: 100%; max-width: 980px; background: #FFF4E5; color: var(--alerte); border: 1px solid #F5D9B0; border-radius: 8px; padding: 6px 6px 6px 12px; font-size: 12.5px; align-items: center; gap: 8px; }
+  #bandeau.actif { display: flex; }
+  #bandeau span { flex: 1; }
+  #bandeau button { height: 24px; width: 24px; padding: 0; border: 0; background: none; color: var(--alerte); font-size: 16px; }
+  .barre { flex: none; width: var(--cadre); max-width: 100%; display: flex; gap: 6px; align-items: center; container-type: inline-size; }
+  .barre-int { display: flex; gap: 6px; align-items: center; width: 100%; }
+  .barre .sep { width: 1px; height: 22px; background: var(--ligne); margin: 0 2px; flex: none; }
+  .barre button:not(.primaire) { padding: 0 8px; }
+  @container (max-width: 459px) { .barre-int { flex-wrap: wrap; gap: 4px; } .barre .sep { display: none; } }
   .barre .espace { flex: 1; }
-  .barre .info { font-size: 12px; color: var(--doux); font-variant-numeric: tabular-nums; }
-  .cadre-ext { position: relative; width: var(--cadre); height: var(--cadre); box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 6px 24px rgba(0,59,92,.12); background: #e9edf0; }
-  /* Taille figée : l'export suppose une carte de exactement 760 × 760 px CSS. */
-  #carte { position: absolute; inset: 0; width: var(--cadre); height: var(--cadre); }
-  #calque { position: absolute; inset: 0; width: var(--cadre); height: var(--cadre); pointer-events: none; opacity: .5; display: none; z-index: 5; }
-  .legende-cadre { font-size: 12px; color: var(--doux); width: var(--cadre); display: flex; justify-content: space-between; }
-  .actions-bas { display: flex; gap: 8px; width: var(--cadre); }
-  .actions-bas .espace { flex: 1; }
+  .barre .txt, .barre .txt-long { display: none; }
+  .barre .txt-court { display: inline; }
+  @container (min-width: 560px) { .barre .txt-long { display: inline; } .barre .txt-court { display: none; } }
+  @container (min-width: 750px) { .barre .txt { display: inline; } }
+  .seul-tiroir { display: none !important; }
+  /* barre d'outils + cadre + légende forment un bloc centré ; le cadre prend toute la place restante */
+  .zone-carte { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+  .cadre-ext {
+    position: relative; flex: none; width: var(--cadre); height: var(--cadre); overflow: hidden; border-radius: 3px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 8px 28px rgba(0,59,92,.14); background: #e9edf0;
+  }
+  /* La carte garde exactement 760 × 760 px CSS (géométrie de l'export) et est réduite à l'affichage. */
+  .cadre-int { position: absolute; left: 0; top: 0; width: 760px; height: 760px; transform: scale(var(--k)); transform-origin: 0 0; }
+  #carte { position: absolute; inset: 0; width: 760px; height: 760px; }
+  .cadre-int .mapboxgl-ctrl-bottom-left { transform: scale(calc(1 / var(--k))); transform-origin: 0 100%; }
+  .cadre-int .mapboxgl-ctrl-bottom-right { transform: scale(calc(1 / var(--k))); transform-origin: 100% 100%; }
+  #calque { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: .5; display: none; z-index: 5; }
+  #accueil { position: absolute; inset: 0; display: grid; place-items: center; z-index: 4; pointer-events: none; }
+  #accueil div { background: rgba(255,255,255,.94); border-radius: 10px; padding: 16px 20px; max-width: 320px; text-align: center; box-shadow: 0 4px 18px rgba(0,0,0,.12); color: var(--gris); }
+  #accueil strong { display: block; color: var(--bleu); font-size: 14px; margin-bottom: 4px; }
+  #occupe { position: absolute; inset: 0; display: none; place-items: center; background: rgba(255,255,255,.6); z-index: 6; font-weight: 600; color: var(--bleu); }
+  #occupe.actif { display: grid; }
+  #occupe span { background: #fff; padding: 8px 14px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,.1); }
+  .legende-cadre { flex: none; width: var(--cadre); max-width: 100%; display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 12px; color: var(--doux); white-space: nowrap; }
+  #lieu { flex: 1 1 180px; min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--ok); }
+  #infoIcones.modifie { color: var(--alerte); }
 
-  /* Marqueurs : seule la partie visible de l'image (.zone) capte la souris,
-     sinon les grands PNG transparents (cartouches 560 × 400) masqueraient leurs voisins. */
-  .mk { line-height: 0; pointer-events: none; }
+  /* Marqueurs : Mapbox GL JS pose pointer-events:auto en style inline sur chaque marqueur ; !important
+     l'annule pour que seule la forme visible (.zone, clip-path) capte la souris. */
+  .mk { line-height: 0; pointer-events: none !important; }
   .mk img { display: block; pointer-events: none; user-select: none; }
-  .mk .zone { position: absolute; pointer-events: auto; cursor: grab; border-radius: 6px; }
-  .mk.sel .zone { outline: 2px dashed var(--rouge); outline-offset: 2px; }
-  .mk.manquante { width: 28px; height: 28px; border-radius: 50%; background: #fff; border: 2px dashed var(--gris); display: grid; place-items: center; line-height: 1; font-weight: 700; color: var(--gris); pointer-events: auto; cursor: grab; }
+  .mk .zone { position: absolute; left: 0; top: 0; pointer-events: auto; cursor: grab; }
+  .mk.sel img { filter: drop-shadow(0 0 1.5px var(--rouge)) drop-shadow(0 0 1.5px var(--rouge)) drop-shadow(0 0 1px var(--rouge)); }
+  .mk.manquante { width: 28px; height: 28px; border-radius: 50%; background: #fff; border: 2px dashed var(--gris); display: grid; place-items: center; line-height: 1; font-weight: 700; color: var(--gris); pointer-events: auto !important; cursor: grab; }
   .mk.manquante img, .mk.manquante .zone { display: none; }
   .mk.manquante::after { content: "?"; }
   .mk.manquante.sel { outline: 2px dashed var(--rouge); outline-offset: 2px; }
@@ -126,117 +192,162 @@
   .carte-armee .mapboxgl-canvas-container.mapboxgl-interactive { cursor: crosshair; }
   .glisse-survol { outline: 3px solid var(--rouge); outline-offset: -3px; }
 
-  /* Fenêtres */
+  /* ---------- fenêtres, messages ---------- */
   .voile { position: fixed; inset: 0; background: rgba(29,31,41,.55); display: none; place-items: center; z-index: 50; }
   .voile.ouvert { display: grid; }
-  .boite { background: #fff; border-radius: 10px; padding: 22px; width: 380px; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+  .boite { background: #fff; border-radius: 10px; padding: 22px; width: 380px; max-width: 94vw; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
   .boite h3 { margin: 0 0 6px; font-size: 16px; }
-  .boite .pied { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+  .boite .pied { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
   .boite .erreur { color: var(--rouge); font-size: 13px; min-height: 18px; margin-top: 8px; }
-  .boite.large { width: auto; max-width: 95vw; }
-  #apercuImg { display: block; width: 760px; height: 760px; border: 1px solid var(--ligne); }
-
-  #occupe { position: absolute; inset: 0; display: none; place-items: center; background: rgba(255,255,255,.55); z-index: 6; font-weight: 600; color: var(--bleu); }
-  #occupe.actif { display: grid; }
-  #toasts { position: fixed; left: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 60; max-width: 328px; }
-  .toast { background: var(--gris-fonce); color: #fff; padding: 10px 14px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.2); font-size: 13px; }
+  .boite.large { width: auto; max-height: 96vh; overflow: auto; padding: 18px; }
+  #apercuImg { display: block; width: min(760px, 88vw, calc(100vh - 170px)); aspect-ratio: 1; height: auto; border: 1px solid var(--ligne); }
+  /* messages en bas à droite, au-dessus de la palette : la carte reste dégagée */
+  #toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; z-index: 60; width: calc(var(--d) - 32px); max-width: 92vw; pointer-events: none; }
+  .toast { background: var(--gris-fonce); color: #fff; padding: 9px 14px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,.2); font-size: 13px; animation: entree .18s ease-out; }
   .toast.erreur { background: var(--rouge); }
   .toast.alerte { background: var(--alerte); }
-  #bandeau { display: none; background: #FFF4E5; color: var(--alerte); border-bottom: 1px solid #F5D9B0; padding: 6px 20px; font-size: 13px; grid-column: 1 / -1; }
-  #bandeau.actif { display: block; }
-  kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--ligne); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: #fff; }
+  @keyframes entree { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .voile-tiroir { display: none; }
+
+  /* ---------- écrans moyens : réglages en tiroir ---------- */
+  @media (max-width: 1099px) {
+    .app { grid-template-columns: minmax(0, 1fr) var(--d); }
+    .gauche {
+      position: fixed; z-index: 45; top: var(--entete); bottom: 0; left: 0; width: min(320px, 92vw);
+      transform: translateX(-104%); transition: transform .2s ease; box-shadow: 0 0 40px rgba(0,0,0,.22);
+    }
+    body.tiroir-ouvert .gauche { transform: none; }
+    body.tiroir-ouvert .voile-tiroir { display: block; position: fixed; inset: var(--entete) 0 0 0; background: rgba(29,31,41,.25); z-index: 44; }
+    .seul-tiroir { display: inline-flex !important; }
+    .marque span { display: none; }
+  }
+  @media (max-width: 1280px) { .marque span { display: none; } }
+  /* ---------- petits écrans : une colonne, la page défile ---------- */
+  @media (max-width: 819px) {
+    html, body { height: auto; }
+    body { overflow: auto; grid-template-rows: auto auto; }
+    .entete { flex-wrap: wrap; padding: 8px 12px; gap: 8px; }
+    .entete .espace { display: none; }
+    .champ-adresse { flex-basis: 100%; max-width: none; order: 5; }
+    .app { grid-template-columns: 1fr; }
+    .droite { border-left: 0; border-top: 1px solid var(--ligne); }
+    .droite .panneau-corps { overflow: visible; }
+    .zone-carte { flex: none; }
+    #toasts { left: 50%; right: auto; transform: translateX(-50%); align-items: center; width: max-content; }
+    .gauche { top: 0; }
+    body.tiroir-ouvert .voile-tiroir { inset: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 </head>
 <body>
-<header>
-  <h1>Carte du bien</h1>
-  <span class="marque">spg partner · éditeur de carte pitch diap. 17</span>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-annuler" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+  <symbol id="i-retablir" viewBox="0 0 24 24"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></symbol>
+  <symbol id="i-moins" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-cible" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></symbol>
+  <symbol id="i-oeil" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-calque" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5z"/><path d="m3 13 9 5 9-5"/></symbol>
+  <symbol id="i-telecharger" viewBox="0 0 24 24"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></symbol>
+  <symbol id="i-reglages" viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></symbol>
+</svg>
+
+<header class="entete">
+  <div class="marque"><strong>Carte du bien</strong><span>spg partner · pitch diap. 17</span></div>
+  <div class="groupe">
+    <input id="rfp" type="text" placeholder="RFP-2026-…" autocomplete="off" aria-label="RFP">
+    <select id="langue" aria-label="Langue du pitch"><option value="fr">FR</option><option value="en">EN</option></select>
+    <button id="btnCharger" class="fantome" type="button" title="Charger la carte enregistrée de ce RFP">Charger</button>
+  </div>
+  <div class="groupe champ-adresse">
+    <input id="adresse" type="text" placeholder="Adresse du bien, ou coordonnées « lat, lon »" autocomplete="off" aria-label="Adresse">
+    <button id="btnOuvrir" class="fantome" type="button">Ouvrir</button>
+    <ul id="resultats" role="listbox"></ul>
+  </div>
   <span class="espace"></span>
   <span class="qui" id="qui"></span>
   <button class="lien" id="btnCode" type="button">Code d'équipe</button>
 </header>
-<main>
-  <aside>
-    <section>
-      <h2>Bien</h2>
-      <div class="rangee">
-        <div style="flex:1"><label for="rfp">RFP</label><input id="rfp" type="text" placeholder="RFP-2026-…" autocomplete="off"></div>
-        <div style="width:90px"><label for="langue">Langue</label>
-          <select id="langue"><option value="fr">FR</option><option value="en">EN</option></select></div>
-        <button id="btnCharger" type="button" style="align-self:flex-end">Charger</button>
-      </div>
-      <label for="adresse">Adresse ou coordonnées « lat, lon »</label>
-      <div class="rangee">
-        <input id="adresse" type="text" placeholder="Place des Alpes 1, 1201 Genève" autocomplete="off">
-        <button id="btnOuvrir" class="secondaire" type="button">Ouvrir</button>
-      </div>
-      <ul id="resultats" role="listbox"></ul>
-      <div id="lieu"></div>
-      <label style="display:flex;gap:6px;align-items:center;margin-top:8px"><input id="pinLibre" type="checkbox"> Déplacer le pin rouge</label>
-    </section>
 
-    <section>
+<main class="app">
+  <aside class="panneau gauche" id="panneauGauche" aria-label="Pré-remplissage">
+    <div class="panneau-corps">
       <h2>Pré-remplissage</h2>
-      <label for="mode">Mode</label>
+      <label for="mode" style="margin-top:0">Type de bien</label>
       <select id="mode"></select>
       <label for="rayon">Rayon de recherche</label>
       <div class="curseur"><input id="rayon" type="range" min="200" max="2500" step="50"><output id="rayonVal"></output></div>
-      <label>Catégories et nombre maximal</label>
+      <div class="titre-cat"><span>Catégories</span><span>nombre max</span></div>
       <div id="categories"></div>
-      <div class="rangee" style="margin-top:10px">
-        <button id="btnPreremplir" class="secondaire" type="button" style="flex:1">Pré-remplir</button>
-      </div>
-      <label style="display:flex;gap:6px;align-items:center"><input id="adapterCadrage" type="checkbox" checked> Adapter le cadrage au résultat</label>
-      <p class="aide">Remplace les icônes automatiques. Les icônes ajoutées à la main sont conservées.</p>
-    </section>
-
-    <section>
-      <h2>Ajouter une icône</h2>
-      <div id="palette"></div>
-      <div class="groupe-pal">Logos</div>
-      <input id="filtreLogos" type="text" placeholder="Rechercher un logo : Migros, HUG, EPFL…" autocomplete="off">
-      <div id="paletteLogos" class="grille-pal logos"></div>
-      <p class="aide">Glissez une icône sur la carte, ou cliquez-la puis cliquez sur la carte. <kbd>Maj</kbd> + clic pour en poser plusieurs.</p>
-    </section>
-
-    <section id="selection">
-      <h2>Sélection</h2>
-      <div id="selContenu"><p class="vide">Cliquez une icône de la carte.</p></div>
-    </section>
-
-    <section>
-      <h2>Raccourcis</h2>
-      <p class="aide"><kbd>Suppr</kbd> supprimer · <kbd>←↑→↓</kbd> déplacer de 1 px, avec <kbd>Maj</kbd> 10 px · <kbd>Ctrl</kbd>+<kbd>Z</kbd> annuler · <kbd>Ctrl</kbd>+<kbd>Y</kbd> rétablir · <kbd>Échap</kbd> désélectionner</p>
-    </section>
+    </div>
+    <div class="panneau-pied">
+      <button id="btnPreremplir" class="secondaire" type="button">Pré-remplir la carte</button>
+      <label class="case"><input id="adapterCadrage" type="checkbox" checked> Adapter le cadrage au résultat</label>
+      <label class="case"><input id="pinLibre" type="checkbox"> Pin du bien déplaçable</label>
+      <p class="aide">Remplace les icônes automatiques ; les ajouts manuels restent.</p>
+    </div>
   </aside>
 
   <div class="scene">
-    <div id="bandeau"></div>
-    <div class="barre">
-      <button id="btnAnnuler" type="button" title="Ctrl+Z" disabled>Annuler</button>
-      <button id="btnRetablir" type="button" title="Ctrl+Y" disabled>Rétablir</button>
-      <button id="btnRecentrer" type="button" disabled>Recentrer sur le pin</button>
-      <span class="espace"></span>
-      <span class="info" id="infoVue"></span>
-    </div>
-    <div class="cadre-ext">
-      <div id="carte"></div>
-      <img id="calque" alt="">
-      <div id="occupe"><span id="occupeTexte">Chargement…</span></div>
-    </div>
-    <div class="legende-cadre">
-      <span>Cadre diap. 17 : 13 × 13 cm · 760 × 760 px · export 1520 × 1520 px</span>
-      <span id="infoIcones"></span>
-    </div>
-    <div class="actions-bas">
-      <button id="btnApercu" type="button" disabled>Aperçu de l'export</button>
-      <button id="btnCalque" type="button" disabled>Superposer l'export</button>
-      <button id="btnTelecharger" type="button" disabled>Télécharger l'image</button>
-      <span class="espace"></span>
-      <button id="btnEnregistrer" class="primaire" type="button" disabled>Enregistrer pour le pitch</button>
+    <div id="bandeau" role="status"><span id="bandeauTexte"></span><button id="bandeauFermer" type="button" aria-label="Fermer">×</button></div>
+    <div class="zone-carte" id="zoneCarte">
+      <div class="barre">
+        <div class="barre-int">
+          <button id="btnReglages" class="seul-tiroir" type="button" title="Réglages du pré-remplissage"><svg class="ico"><use href="#i-reglages"/></svg><span class="txt">Réglages</span></button>
+          <button id="btnAnnuler" class="carre" type="button" title="Annuler (Ctrl+Z)" aria-label="Annuler" disabled><svg class="ico"><use href="#i-annuler"/></svg></button>
+          <button id="btnRetablir" class="carre" type="button" title="Rétablir (Ctrl+Y)" aria-label="Rétablir" disabled><svg class="ico"><use href="#i-retablir"/></svg></button>
+          <span class="sep"></span>
+          <button id="btnZoomMoins" class="carre" type="button" title="Dézoomer" aria-label="Dézoomer"><svg class="ico"><use href="#i-moins"/></svg></button>
+          <button id="btnZoomPlus" class="carre" type="button" title="Zoomer" aria-label="Zoomer"><svg class="ico"><use href="#i-plus"/></svg></button>
+          <button id="btnRecentrer" class="carre" type="button" title="Recentrer sur le pin" aria-label="Recentrer sur le pin" disabled><svg class="ico"><use href="#i-cible"/></svg></button>
+          <span class="espace"></span>
+          <button id="btnApercu" type="button" title="Aperçu de l'export" disabled><svg class="ico"><use href="#i-oeil"/></svg><span class="txt">Aperçu</span></button>
+          <button id="btnCalque" type="button" title="Superposer l'export à la carte" disabled><svg class="ico"><use href="#i-calque"/></svg><span class="txt">Superposer</span></button>
+          <button id="btnTelecharger" type="button" title="Télécharger l'image (JPEG 1520 px)" disabled><svg class="ico"><use href="#i-telecharger"/></svg><span class="txt">Télécharger</span></button>
+          <button id="btnEnregistrer" class="primaire" type="button" disabled><span class="txt-long">Enregistrer pour le pitch</span><span class="txt-court">Enregistrer</span></button>
+        </div>
+      </div>
+      <div class="cadre-ext" id="cadreExt">
+        <div class="cadre-int"><div id="carte"></div></div>
+        <img id="calque" alt="">
+        <div id="accueil"><div><strong>Ouvrez un bien</strong>Saisissez l'adresse ou le RFP dans la barre du haut : la carte se cadre et se pré-remplit.</div></div>
+        <div id="occupe"><span id="occupeTexte">Chargement…</span></div>
+      </div>
+      <div class="legende-cadre">
+        <span id="lieu" title="Bien ouvert"></span>
+        <span id="infoVue" title="Cadre diap. 17 : 13 × 13 cm · export 1520 × 1520 px"></span>
+        <span id="infoIcones"></span>
+      </div>
     </div>
   </div>
+
+  <aside class="panneau droite" aria-label="Sélection et ajout d'icônes">
+    <section class="bloc-selection" id="selection">
+      <h2>Sélection</h2>
+      <div id="selContenu"><p class="vide">Cliquez une icône de la carte pour la modifier : orientation, taille, suppression.</p></div>
+    </section>
+    <div class="onglets" role="tablist">
+      <button type="button" role="tab" id="ongletIcones" aria-selected="true" aria-controls="corpsIcones">Icônes</button>
+      <button type="button" role="tab" id="ongletLogos" aria-selected="false" aria-controls="corpsLogos">Logos <span class="nb" id="nbLogos"></span></button>
+    </div>
+    <div class="panneau-corps" id="corpsIcones" role="tabpanel">
+      <div id="palette"></div>
+      <p class="aide">Glissez une icône sur la carte, ou cliquez-la puis cliquez la carte. <kbd>Maj</kbd> + clic : en poser plusieurs.</p>
+    </div>
+    <div class="panneau-corps" id="corpsLogos" role="tabpanel" hidden>
+      <div class="recherche-logos"><input id="filtreLogos" type="text" placeholder="Rechercher : Migros, HUG, EPFL…" autocomplete="off" aria-label="Rechercher un logo"></div>
+      <div id="paletteLogos" class="grille-pal logos"></div>
+    </div>
+    <div class="panneau-pied">
+      <details class="raccourcis">
+        <summary>Raccourcis clavier</summary>
+        <p class="aide"><kbd>Suppr</kbd> supprimer · <kbd>←↑→↓</kbd> déplacer de 1 px (export), <kbd>Maj</kbd> 10 px · <kbd>Ctrl</kbd>+<kbd>Z</kbd> annuler · <kbd>Ctrl</kbd>+<kbd>Y</kbd> rétablir · <kbd>Échap</kbd> désélectionner</p>
+      </details>
+    </div>
+  </aside>
 </main>
+<div class="voile-tiroir" id="voileTiroir"></div>
 
 <div class="voile" id="voileCode" role="dialog" aria-modal="true" aria-labelledby="titreCode">
   <form class="boite" id="formCode">
@@ -284,6 +395,9 @@ const CONFIG = {
   TAILLE: 760,                    // cadre CSS, identique au placeholder diap. 17
   ECHELLE_EXPORT: 2,              // @2x : image finale 1520 × 1520
   JPEG_QUALITE: 0.92,
+  // Texte « © Mapbox © OpenStreetMap » hors de l'image : il figure sur la diapositive (carte_sources),
+  // ce que Mapbox admet pour l'imprimé. Le logo Mapbox, lui, reste obligatoire sur l'image.
+  EXPORT_ATTRIBUTION: false,
   GEOCODAGE_PERMANENT: true,      // l'état enregistré conserve les coordonnées du pin
   PRESETS_URL: 'presets.json',
   CENTRE_DEFAUT: [6.1432, 46.2044],
@@ -295,7 +409,13 @@ const CONFIG = {
 const $ = (s, r = document) => r.querySelector(s);
 const arrondi = (n, d) => Math.round(n * 10 ** d) / 10 ** d;
 const uid = () => 'm' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
-const RE_CARTOUCHE = /^(ref_(?:vendu|advisory|letting))(_g|_b|_bg|_n)?$/;
+const RE_CARTOUCHE = /^(ref_(?:vendu|advisory|letting)(?:_fr)?)(_g|_b|_bg|_n)?$/;
+// Cartouches de références : version française = suffixe _fr avant l'orientation (ref_vendu_fr_bg).
+const RE_REF = /^ref_(vendu|advisory|letting)(_fr)?(_g|_b|_bg|_n)?$/;
+const iconeEnLangue = (icone, langue) => {
+  const m = String(icone).match(RE_REF);
+  return m ? `ref_${m[1]}${langue === 'fr' ? '_fr' : ''}${m[3] || ''}` : icone;
+};
 const ORIENTATIONS = ['', '_g', '_b', '_bg', '_n'];
 const LIBELLES_ORIENTATION = { '': 'haut-droite', '_g': 'gauche', '_b': 'bas', '_bg': 'bas-gauche', '_n': 'sans queue' };
 
@@ -313,9 +433,8 @@ function toast(msg, type = '', ms = 4500) {
   setTimeout(() => t.remove(), ms);
 }
 function bandeau(msg) {
-  const b = $('#bandeau');
-  b.textContent = msg || '';
-  b.classList.toggle('actif', !!msg);
+  $('#bandeauTexte').textContent = msg || '';
+  $('#bandeau').classList.toggle('actif', !!msg);
 }
 function occupe(actif, texte) {
   $('#occupe').classList.toggle('actif', !!actif);
@@ -333,6 +452,8 @@ const app = {
   vues: new Map(),     // id -> { marker, node, img }
   selection: null,
   arme: null,
+  k: 1,                // échelle d'affichage du cadre (taille affichée / 760)
+  refusMapbox: [],     // horodatages des 401/403 Mapbox récents
   histo: [],
   futur: [],
   modifie: false,
@@ -381,7 +502,39 @@ async function svgNormalise(url) {
   return URL.createObjectURL(blob);
 }
 
-// Rectangle des pixels visibles (alpha), en fractions de l'image : sert de zone de clic.
+// Forme des pixels visibles (alpha) : contour gauche puis droit, par tranches horizontales, en fractions
+// de l'image. Sert de clip-path à la zone de clic : la flèche d'un cartouche ne masque plus ses voisins.
+function formeOpaque(img) {
+  const k = Math.min(1, 400 / Math.max(img.naturalWidth, img.naturalHeight));
+  const w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, 0, 0, w, h);
+  let d;
+  try { d = ctx.getImageData(0, 0, w, h).data; } catch { return null; }
+  const pas = Math.max(1, Math.round(h / 48));
+  const gauche = [], droite = [];
+  for (let y = 0; y < h; y += pas) {
+    const y2 = Math.min(h, y + pas);
+    let x0 = w, x1 = -1;
+    for (let yy = y; yy < y2; yy++) {
+      for (let x = 0; x < w; x++) {
+        if (d[(yy * w + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; }
+      }
+    }
+    if (x1 < 0) continue;
+    // 1 px de marge de chaque côté : les parties fines (pointe de la flèche) restent attrapables
+    const g = Math.max(0, x0 - 1) / w, dr = Math.min(w, x1 + 2) / w;
+    gauche.push([g, y / h], [g, y2 / h]);
+    droite.push([dr, y / h], [dr, y2 / h]);
+  }
+  if (!gauche.length) return null;
+  const pct = v => (v * 100).toFixed(2) + '%';
+  return 'polygon(' + [...gauche, ...droite.reverse()].map(([x, y]) => pct(x) + ' ' + pct(y)).join(', ') + ')';
+}
+
+// Rectangle des pixels visibles (alpha), en fractions de l'image.
 function boiteOpaque(img) {
   const k = Math.min(1, 400 / Math.max(img.naturalWidth, img.naturalHeight));
   const w = Math.max(1, Math.round(img.naturalWidth * k)), h = Math.max(1, Math.round(img.naturalHeight * k));
@@ -414,7 +567,7 @@ function chargerVisuel(icone) {
     const src = /\.svg$/i.test(icone) ? await svgNormalise(url) : url;
     const img = await chargerImage(src);
     if (!img.naturalWidth || !img.naturalHeight) throw new Error('Image vide : ' + icone);
-    return { src, img, nw: img.naturalWidth, nh: img.naturalHeight, boite: boiteOpaque(img) };
+    return { src, img, nw: img.naturalWidth, nh: img.naturalHeight, boite: boiteOpaque(img), forme: formeOpaque(img) };
   })();
   cacheVisuels.set(icone, p);
   p.catch(() => cacheVisuels.delete(icone));
@@ -454,7 +607,8 @@ function libellePalette(icone) {
     const l = (app.presets?.logos || []).find(x => x.fichier === icone);
     return l ? l.libelle : icone;
   }
-  const base = (icone.match(RE_CARTOUCHE) || [])[1] || icone;
+  const ref = icone.match(RE_REF);
+  const base = ref ? `ref_${ref[1]}` : icone;
   const p = (app.presets?.palette || []).find(x => x.icone === icone || x.icone === base);
   return p ? p.libelle : icone;
 }
@@ -487,11 +641,13 @@ function initCarte() {
     dragRotate: false,
     pitchWithRotate: false,
     touchPitch: false,
-    attributionControl: true
+    attributionControl: false,   // remplacée par la version compacte (bouton ⓘ) : obligatoire, mais discrète
+    logoPosition: 'bottom-left'  // logo Mapbox obligatoire : déplaçable, pas supprimable
   });
   map.touchZoomRotate.disableRotation();
   if (map.keyboard && typeof map.keyboard.disableRotation === 'function') map.keyboard.disableRotation();
-  map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+  if (mapboxgl.AttributionControl) map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right');
+  map.on('style.load', () => retirerCouchesInvisibles(map));
 
   map.on('load', () => {
     app.pret = true;
@@ -503,9 +659,18 @@ function initCarte() {
     majBoutons();
   });
   map.on('error', e => {
-    const s = e && e.error && (e.error.status || (e.error.message || '').match(/\b(401|403)\b/)?.[1]);
-    if (String(s) === '401' || String(s) === '403') {
-      bandeau('Mapbox refuse le token (401/403) : vérifiez le token pk. et sa restriction d\'URL, qui doit couvrir l\'adresse de cette page.');
+    const err = (e && e.error) || {};
+    const s = Number(err.status) || Number(String(err.message || '').match(/\b(401|403)\b/)?.[1]) || 0;
+    const url = String(err.url || '').replace(/access_token=[^&]+/, 'access_token=…');
+    console.warn('Mapbox :', s || '', err.message || err, url);
+    if (s !== 401 && s !== 403) return;
+    // Une tuile isolée refusée (jeu de données premium, coupure réseau, proxy d'entreprise) n'empêche pas
+    // de travailler : le bandeau n'apparaît que si le style lui-même est refusé ou si les refus se répètent.
+    const t = Date.now();
+    app.refusMapbox = app.refusMapbox.filter(x => t - x < 30000).concat(t);
+    const style = !e.tile && !e.sourceId;
+    if (style || app.refusMapbox.length >= 5) {
+      bandeau(`Mapbox refuse ${style ? 'le style' : 'les tuiles'} (HTTP ${s}) : vérifiez le token pk. et sa restriction d'URL (https://spg-map-icons.github.io).`);
     }
   });
   map.on('move', majInfoVue);
@@ -533,11 +698,41 @@ function initCarte() {
     const icone = e.dataTransfer && e.dataTransfer.getData('text/x-spg-icone');
     if (!icone) return;
     e.preventDefault();
+    // le cadre est réduit à l'affichage (transform) : coordonnées écran ramenées aux px de la carte
     const r = zone.getBoundingClientRect();
-    const ll = map.unproject([e.clientX - r.left, e.clientY - r.top]);
+    const k = r.width / (zone.offsetWidth || CONFIG.TAILLE) || 1;
+    const ll = map.unproject([(e.clientX - r.left) / k, (e.clientY - r.top) / k]);
     ajouterMarqueur(icone, ll);
   });
   app.map = map;
+}
+
+// Couches raster à opacité 0 (le satellite du style SPG) : invisibles, mais elles chargent des tuiles et
+// ajoutent « © Maxar » à l'attribution. Retirées dans l'éditeur ; l'export n'en montre rien non plus.
+function retirerCouchesInvisibles(map) {
+  try {
+    for (const l of (map.getStyle()?.layers || [])) {
+      if (l.type === 'raster' && map.getPaintProperty(l.id, 'raster-opacity') === 0) map.removeLayer(l.id);
+    }
+  } catch (e) {
+    console.warn('Couches invisibles non retirées :', e);
+  }
+}
+
+// Taille du cadre : la plus grande qui tient dans la colonne centrale, sans dépasser 760 px.
+// La carte reste 760 × 760 px CSS (géométrie identique à l'export) et n'est que réduite à l'écran.
+function ajusterCadre() {
+  const z = $('#zoneCarte');
+  const empile = window.matchMedia('(max-width: 819px)').matches;
+  const gap = parseFloat(getComputedStyle(z).rowGap) || 0;
+  const autour = $('.barre').offsetHeight + $('.legende-cadre').offsetHeight + 2 * gap;
+  const w = z.clientWidth, h = empile ? Infinity : z.clientHeight - autour;
+  if (!w || !(h > 0)) return;
+  const S = Math.max(240, Math.floor(Math.min(w, h, CONFIG.TAILLE)));
+  app.k = S / CONFIG.TAILLE;
+  document.documentElement.style.setProperty('--cadre', S + 'px');
+  document.documentElement.style.setProperty('--k', String(app.k));
+  majInfoVue();
 }
 
 function majInfoVue() {
@@ -545,7 +740,7 @@ function majInfoVue() {
   const z = app.map.getZoom();
   const lat = app.map.getCenter().lat;
   const largeur = CONFIG.TAILLE * 78271.51696 * Math.cos(lat * Math.PI / 180) / 2 ** z;
-  $('#infoVue').textContent = `zoom ${z.toFixed(2)} · largeur ≈ ${largeur >= 1000 ? (largeur / 1000).toFixed(2).replace('.', ',') + ' km' : Math.round(largeur) + ' m'}`;
+  $('#infoVue').textContent = `${largeur >= 1000 ? (largeur / 1000).toFixed(2).replace('.', ',') + ' km' : Math.round(largeur) + ' m'} de large · zoom ${z.toFixed(2)}${app.k < 0.995 ? ` · affiché à ${Math.round(app.k * 100)} %` : ''}`;
 }
 
 function cadrerSurRayon(lon, lat, r) {
@@ -568,11 +763,7 @@ function poserVisuel(vue, m) {
     img.src = v.src;
     img.style.width = t.w + 'px';
     img.style.height = t.h + 'px';
-    let x = v.boite.x0 * t.w, y = v.boite.y0 * t.h;
-    let w = (v.boite.x1 - v.boite.x0) * t.w, h = (v.boite.y1 - v.boite.y0) * t.h;
-    if (w < 18) { x -= (18 - w) / 2; w = 18; }
-    if (h < 18) { y -= (18 - h) / 2; h = 18; }
-    Object.assign(zone.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px' });
+    Object.assign(zone.style, { width: t.w + 'px', height: t.h + 'px', clipPath: v.forme || 'none' });
   }).catch(() => {
     node.classList.add('manquante');
     node.title = `${libellePalette(m.icone)} — fichier absent du dépôt`;
@@ -636,6 +827,7 @@ function deplacer(id, lon, lat) {
 
 function ajouterMarqueur(icone, ll) {
   if (!app.etat.bien) { toast('Ouvrez d\'abord une adresse.', 'alerte'); return; }
+  icone = iconeEnLangue(icone, app.etat.langue);
   memoriser();
   const logo = estLogo(icone);
   const m = {
@@ -707,7 +899,7 @@ function majSelection() {
   if (!m) {
     const p = document.createElement('p');
     p.className = 'vide';
-    p.textContent = 'Cliquez une icône de la carte.';
+    p.textContent = 'Cliquez une icône de la carte pour la modifier : orientation, taille, suppression.';
     zone.appendChild(p);
     return;
   }
@@ -718,12 +910,24 @@ function majSelection() {
     const dd = document.createElement('dd'); dd.textContent = v;
     dl.append(dt, dd);
   };
+  const tete = document.createElement('div');
+  tete.className = 'sel-tete';
+  const vignette = document.createElement('img');
+  vignette.alt = '';
+  vignette.src = iconeUrl(m.icone);
+  vignette.onerror = () => { vignette.style.visibility = 'hidden'; };
+  const titre = document.createElement('div');
+  const fort = document.createElement('strong');
+  const petit = document.createElement('small');
+  fort.textContent = m.id === 'bien' ? 'Pin du bien' : (m.nom || libellePalette(m.icone));
+  petit.textContent = m.id === 'bien' ? (app.etat.adresse || '') : (m.nom ? libellePalette(m.icone) : '');
+  titre.append(fort, petit);
+  tete.append(vignette, titre);
+  zone.appendChild(tete);
   if (m.id === 'bien') {
-    ligne('Élément', 'Pin du bien');
     ligne('Position', `${m.lat.toFixed(6)}, ${m.lon.toFixed(6)}`);
+    ligne('Déplacement', $('#pinLibre').checked ? 'autorisé' : 'verrouillé');
   } else {
-    ligne('Nom', m.nom);
-    ligne('Icône', libellePalette(m.icone));
     const o = m.icone.match(RE_CARTOUCHE);
     if (o) ligne('Orientation', LIBELLES_ORIENTATION[o[2] || '']);
     ligne('Origine', m.source === 'auto' ? 'pré-remplissage' : 'ajout manuel');
@@ -741,7 +945,13 @@ function majSelection() {
     b.addEventListener('click', fn);
     actions.appendChild(b);
   };
-  if (m.id !== 'bien') {
+  if (m.id === 'bien') {
+    bouton($('#pinLibre').checked ? 'Verrouiller le pin' : 'Déverrouiller le pin', () => {
+      $('#pinLibre').checked = !$('#pinLibre').checked;
+      $('#pinLibre').dispatchEvent(new Event('change'));
+      majSelection();
+    });
+  } else {
     if (RE_CARTOUCHE.test(m.icone)) bouton('Orientation suivante', () => orientationSuivante(m.id));
     if (estLogo(m.icone)) {
       bouton('Plus petit', () => redimensionner(m.id, 0.85));
@@ -788,6 +998,17 @@ function retablir() {
   restaurer(app.futur.pop());
 }
 
+// Changement de langue : cartouches de la carte et de la palette passent dans la langue du pitch.
+function appliquerLangue() {
+  let change = false;
+  for (const m of app.etat.marqueurs) {
+    const n = iconeEnLangue(m.icone, app.etat.langue);
+    if (n !== m.icone) { m.icone = n; change = true; }
+  }
+  if (change) { redessiner(); marquerModifie(); }
+  if (app.presets) construirePalette();
+}
+
 function marquerModifie() {
   app.modifie = true;
   app.dernierExport = null;
@@ -806,7 +1027,9 @@ function majBoutons() {
   $('#btnTelecharger').disabled = !ouvert;
   $('#btnEnregistrer').disabled = !ouvert;
   const n = app.etat.marqueurs.length;
-  $('#infoIcones').textContent = ouvert ? `${n} icône${n > 1 ? 's' : ''}${app.modifie ? ' · modifications non enregistrées' : ''}` : '';
+  $('#infoIcones').textContent = ouvert ? `${n} icône${n > 1 ? 's' : ''}${app.modifie ? ' · non enregistré' : ' · enregistré'}` : '';
+  $('#infoIcones').classList.toggle('modifie', ouvert && app.modifie);
+  $('#accueil').hidden = !!app.etat.bien;
 }
 
 /* ---------- palette ---------- */
@@ -858,8 +1081,8 @@ function construirePalette() {
     titre.className = 'groupe-pal';
     titre.textContent = g;
     const grille = document.createElement('div');
-    grille.className = 'grille-pal';
-    for (const p of liste) grille.appendChild(elementPalette(p.icone, p.libelle));
+    grille.className = 'grille-pal' + (liste.every(p => RE_REF.test(p.icone)) ? ' refs' : '');
+    for (const p of liste) grille.appendChild(elementPalette(iconeEnLangue(p.icone, app.etat.langue), p.libelle));
     zone.append(titre, grille);
   }
   const logos = $('#paletteLogos');
@@ -868,6 +1091,16 @@ function construirePalette() {
     if (!RE_ICONE.test(l.fichier) || !estLogo(l.fichier)) continue;
     logos.appendChild(elementPalette(l.fichier, l.libelle));
   }
+  $('#nbLogos').textContent = logos.children.length ? String(logos.children.length) : '';
+  filtrerLogos();
+}
+
+function choisirOnglet(logos) {
+  $('#ongletIcones').setAttribute('aria-selected', String(!logos));
+  $('#ongletLogos').setAttribute('aria-selected', String(logos));
+  $('#corpsIcones').hidden = logos;
+  $('#corpsLogos').hidden = !logos;
+  if (logos) setTimeout(() => $('#filtreLogos').focus(), 0);
 }
 
 function filtrerLogos() {
@@ -1031,6 +1264,7 @@ function ouvrirLieu(res, { preremplirAuto = true } = {}) {
   app.histo = []; app.futur = [];
   app.cadragePreremplissage = true;
   $('#lieu').textContent = '● ' + res.libelle;
+  $('#lieu').title = res.libelle;
   cadrerSurRayon(res.lon, res.lat, reglages.rayon_m);
   redessiner();
   app.modifie = true;
@@ -1135,7 +1369,7 @@ async function preremplir() {
     }, 45000);
     if (rep.job && !Array.isArray(rep.marqueurs)) rep = await attendreResultat(rep.job);
     const brut = Array.isArray(rep.marqueurs) ? rep.marqueurs : [];
-    const liste = brut.filter(marqueurValide).map(x => normaliserMarqueur(x, 'auto'));
+    const liste = brut.filter(marqueurValide).map(x => normaliserMarqueur({ ...x, icone: iconeEnLangue(x.icone, app.etat.langue) }, 'auto'));
     memoriser();
     app.etat.marqueurs = app.etat.marqueurs.filter(m => m.source !== 'auto').concat(liste);
     redessiner();
@@ -1160,7 +1394,7 @@ async function preremplir() {
 function urlFond(lon, lat, zoom) {
   const T = CONFIG.TAILLE;
   return `https://api.mapbox.com/styles/v1/${CONFIG.STYLE_OWNER}/${CONFIG.STYLE_ID}/static/`
-    + `${lon},${lat},${zoom},0,0/${T}x${T}@2x?attribution=true&logo=true&access_token=${encodeURIComponent(CONFIG.MAPBOX_TOKEN)}`;
+    + `${lon},${lat},${zoom},0,0/${T}x${T}@2x?attribution=${CONFIG.EXPORT_ATTRIBUTION}&logo=true&access_token=${encodeURIComponent(CONFIG.MAPBOX_TOKEN)}`;
 }
 
 async function chargerFond(lon, lat, zoom) {
@@ -1173,7 +1407,7 @@ async function chargerFond(lon, lat, zoom) {
     return { img, voie: 'directe' };
   } catch (e) {
     console.warn('Fond Mapbox direct impossible, repli via n8n :', e);
-    const rep = await appelerWebhook('fond', { lon, lat, zoom, taille: CONFIG.TAILLE });
+    const rep = await appelerWebhook('fond', { lon, lat, zoom, taille: CONFIG.TAILLE, attribution: CONFIG.EXPORT_ATTRIBUTION });
     if (!rep.base64) throw new Error('n8n n\'a pas renvoyé de fond de carte.');
     const img = await chargerImage(`data:${rep.mime || 'image/jpeg'};base64,${rep.base64}`, { cache: false });
     return { img, voie: 'n8n' };
@@ -1329,6 +1563,7 @@ function restaurerEtat(e) {
   $('#langue').value = app.etat.langue;
   $('#adresse').value = app.etat.adresse;
   $('#lieu').textContent = app.etat.adresse ? '● ' + app.etat.adresse : '';
+  $('#lieu').title = app.etat.adresse || '';
   if (app.presets.modes[app.etat.reglages.mode]) afficherReglages();
   if (e.vue && Number.isFinite(e.vue.lon) && Number.isFinite(e.vue.zoom)) {
     app.map.jumpTo({ center: [e.vue.lon, e.vue.lat], zoom: e.vue.zoom, bearing: 0, pitch: 0 });
@@ -1339,6 +1574,7 @@ function restaurerEtat(e) {
   redessiner();
   app.modifie = false;
   majBoutons();
+  appliquerLangue(); // carte enregistrée avant les cartouches FR : mise en conformité (et à réenregistrer)
 }
 
 async function chargerRfp() {
@@ -1358,6 +1594,7 @@ async function chargerRfp() {
         // reprise de la carte de l'autre langue : elle sera enregistrée dans la langue demandée
         $('#langue').value = langue;
         app.etat.langue = langue;
+        appliquerLangue();
         app.modifie = true;
         majBoutons();
         toast(`Pas encore de carte ${langue.toUpperCase()} : reprise de la version ${rep.langue_source.toUpperCase()}.`, 'alerte', 7000);
@@ -1446,7 +1683,7 @@ document.addEventListener('keydown', e => {
   const ctrl = e.ctrlKey || e.metaKey;
   if (ctrl && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); annuler(); return; }
   if (ctrl && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) { e.preventDefault(); retablir(); return; }
-  if (e.key === 'Escape') { desarmer(); selectionner(null); return; }
+  if (e.key === 'Escape') { desarmer(); selectionner(null); basculerTiroir(false); return; }
   if (!app.selection) return;
   if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); supprimer(app.selection); return; }
   const pas = e.shiftKey ? 10 : 1;
@@ -1478,7 +1715,7 @@ function brancher() {
   $('#rfp').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); chargerRfp(); } });
   $('#rfp').addEventListener('change', () => { app.etat.rfp_id = $('#rfp').value.trim().toUpperCase(); });
   $('#filtreLogos').addEventListener('input', filtrerLogos);
-  $('#langue').addEventListener('change', () => { app.etat.langue = $('#langue').value; });
+  $('#langue').addEventListener('change', () => { app.etat.langue = $('#langue').value; appliquerLangue(); });
   $('#mode').addEventListener('change', () => appliquerMode($('#mode').value));
   $('#rayon').addEventListener('input', () => {
     app.etat.reglages.rayon_m = Number($('#rayon').value);
@@ -1492,8 +1729,16 @@ function brancher() {
     if (!v) return;
     v.marker.setDraggable($('#pinLibre').checked);
     v.node.classList.toggle('deverrouille', $('#pinLibre').checked);
+    if (app.selection === 'bien') majSelection();
   });
-  $('#btnPreremplir').addEventListener('click', preremplir);
+  $('#btnPreremplir').addEventListener('click', () => { basculerTiroir(false); preremplir(); });
+  $('#btnReglages').addEventListener('click', () => basculerTiroir());
+  $('#voileTiroir').addEventListener('click', () => basculerTiroir(false));
+  $('#bandeauFermer').addEventListener('click', () => bandeau(''));
+  $('#ongletIcones').addEventListener('click', () => choisirOnglet(false));
+  $('#ongletLogos').addEventListener('click', () => choisirOnglet(true));
+  $('#btnZoomPlus').addEventListener('click', () => app.map && app.map.zoomIn({ duration: 200 }));
+  $('#btnZoomMoins').addEventListener('click', () => app.map && app.map.zoomOut({ duration: 200 }));
   $('#btnAnnuler').addEventListener('click', annuler);
   $('#btnRetablir').addEventListener('click', retablir);
   $('#btnRecentrer').addEventListener('click', () => {
@@ -1513,6 +1758,11 @@ function brancher() {
   });
 }
 
+function basculerTiroir(ouvrir) {
+  const b = document.body;
+  b.classList.toggle('tiroir-ouvert', ouvrir === undefined ? !b.classList.contains('tiroir-ouvert') : !!ouvrir);
+}
+
 /* ---------- démarrage ---------- */
 function parametresUrl() {
   const p = new URLSearchParams(location.search);
@@ -1524,11 +1774,18 @@ function parametresUrl() {
 async function demarrer() {
   brancher();
   afficherQui();
+  ajusterCadre();
+  if (typeof ResizeObserver === 'function') {
+    const ro = new ResizeObserver(() => requestAnimationFrame(ajusterCadre));
+    ['#zoneCarte', '.barre', '.legende-cadre'].forEach(sel => ro.observe($(sel)));
+  } else {
+    window.addEventListener('resize', ajusterCadre);
+  }
   initCarte();
   await chargerPresets();
   if (!local.get('spg_carte_code')) demanderCode();
   const p = parametresUrl();
-  if (p.get('langue') === 'en' || p.get('langue') === 'fr') { $('#langue').value = p.get('langue'); app.etat.langue = p.get('langue'); }
+  if (p.get('langue') === 'en' || p.get('langue') === 'fr') { $('#langue').value = p.get('langue'); app.etat.langue = p.get('langue'); construirePalette(); }
   if (p.get('mode') && app.presets.modes[p.get('mode')]) appliquerMode(p.get('mode'));
   if (p.get('rfp')) $('#rfp').value = p.get('rfp');
   if (p.get('adresse')) $('#adresse').value = p.get('adresse');
