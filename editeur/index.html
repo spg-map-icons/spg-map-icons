@@ -287,7 +287,7 @@ const CONFIG = {
   GEOCODAGE_PERMANENT: true,      // l'état enregistré conserve les coordonnées du pin
   PRESETS_URL: 'presets.json',
   CENTRE_DEFAUT: [6.1432, 46.2044],
-  DELAI_PREREMPLIR_MS: 150000,
+  DELAI_PREREMPLIR_MS: 180000,   // attente maximale du résultat (le pré-remplissage tourne en tâche de fond)
   POIDS_MAX_IMAGE: 4 * 1024 * 1024 // base64 ; au-delà on refuse l'envoi
 };
 
@@ -1095,18 +1095,45 @@ function normaliserMarqueur(x, source) {
   };
 }
 
+const pause = ms => new Promise(ok => setTimeout(ok, ms));
+
+// n8n Cloud coupe une requête webhook au-delà d'environ une minute : « preremplir » répond tout de suite
+// avec un numéro de tâche, RFP-08 tourne ensuite, et l'éditeur vient chercher le résultat (« resultat »).
+// Chaque consultation attend jusqu'à 35 s côté n8n : 1 à 2 consultations par pré-remplissage.
+async function attendreResultat(job) {
+  const debut = Date.now();
+  const par = local.get('spg_carte_initiales') || '';
+  let echecs = 0;
+  await pause(3000);
+  while (Date.now() - debut < CONFIG.DELAI_PREREMPLIR_MS) {
+    occupe(true, `Pré-remplissage en cours… ${Math.round((Date.now() - debut) / 1000)} s`);
+    try {
+      const rep = await appelerWebhook('resultat', { job, par }, 55000);
+      echecs = 0;
+      if (!rep.en_cours) return rep;
+    } catch (e) {
+      // un refus du code ou une erreur de RFP-08 arrête l'attente ; un raté réseau isolé est réessayé
+      if (e instanceof ErreurCode || ++echecs >= 3 || !/injoignable|à temps/.test(e.message)) throw e;
+    }
+    await pause(1000);
+  }
+  throw new Error('Pré-remplissage trop long (plus de 3 min) : relancez-le, ou consultez les exécutions de RFP-08 dans n8n.');
+}
+
 async function preremplir() {
   if (!app.etat.bien) { toast('Ouvrez d\'abord une adresse.', 'alerte'); return; }
   const reg = app.etat.reglages;
-  occupe(true, 'Pré-remplissage en cours… (10 à 40 s)');
+  occupe(true, 'Pré-remplissage en cours… (20 s à 2 min)');
   $('#btnPreremplir').disabled = true;
   try {
-    const rep = await appelerWebhook('preremplir', {
+    let rep = await appelerWebhook('preremplir', {
       rfp_id: app.etat.rfp_id, langue: app.etat.langue,
       adresse: app.etat.adresse, commune: app.etat.commune, canton: app.etat.canton,
       lon: app.etat.bien.lon, lat: app.etat.bien.lat,
-      mode: reg.mode, rayon_m: reg.rayon_m, max_pois: reg.max_pois, quotas: reg.quotas
-    }, CONFIG.DELAI_PREREMPLIR_MS);
+      mode: reg.mode, rayon_m: reg.rayon_m, max_pois: reg.max_pois, quotas: reg.quotas,
+      par: local.get('spg_carte_initiales') || ''
+    }, 45000);
+    if (rep.job && !Array.isArray(rep.marqueurs)) rep = await attendreResultat(rep.job);
     const brut = Array.isArray(rep.marqueurs) ? rep.marqueurs : [];
     const liste = brut.filter(marqueurValide).map(x => normaliserMarqueur(x, 'auto'));
     memoriser();
