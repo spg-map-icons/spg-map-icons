@@ -112,6 +112,13 @@
   #selContenu dt { color: var(--doux); }
   #selContenu dd { margin: 0; overflow-wrap: anywhere; }
   #selContenu .actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sel-nom { display: grid; gap: 6px; margin: 0 0 10px; }
+  .sel-nom input[type=text] { height: 30px; }
+  .segments { display: flex; border: 1px solid var(--ligne); border-radius: 6px; overflow: hidden; }
+  .segments button { flex: 1; height: 30px; border: 0; border-radius: 0; border-right: 1px solid var(--ligne); background: #fff; font-size: 12.5px; padding: 0 6px; }
+  .segments button:last-child { border-right: 0; }
+  .segments button:hover:not(:disabled) { background: var(--survol); }
+  .segments button[aria-pressed="true"]:not(:disabled) { background: var(--bleu); color: #fff; }
 
   /* Palette */
   .onglets { display: flex; gap: 4px; padding: 10px 16px 0; border-bottom: 1px solid var(--ligne); }
@@ -187,6 +194,13 @@
   .mk.manquante img, .mk.manquante .zone { display: none; }
   .mk.manquante::after { content: "?"; }
   .mk.manquante.sel { outline: 2px dashed var(--rouge); outline-offset: 2px; }
+  /* Nom sous l'icône : élément du marqueur lui-même (même sélection, même déplacement). Police et couleurs
+     posées par le script (constante ETIQUETTE) pour être identiques à l'export. */
+  .mk .etiquette { position: absolute; left: 50%; top: 0; transform: translateX(-50%); white-space: pre; text-align: center;
+    padding: 0 2px; border-radius: 3px; pointer-events: auto; cursor: grab; user-select: none;
+    text-shadow: 1px 0 0 #fff, -1px 0 0 #fff, 0 1px 0 #fff, 0 -1px 0 #fff, 1px 1px 1px #fff, -1px -1px 1px #fff, 1px -1px 1px #fff, -1px 1px 1px #fff; }
+  .mk.sel .etiquette { outline: 1.5px solid var(--rouge); outline-offset: 1px; }
+  .mk.manquante .etiquette, .mk-bien .etiquette { display: none; }
   .mk-bien .zone { cursor: default; }
   .mk-bien.deverrouille .zone { cursor: grab; }
   .carte-armee .mapboxgl-canvas-container.mapboxgl-interactive { cursor: crosshair; }
@@ -278,6 +292,13 @@
       <select id="mode"></select>
       <label for="rayon">Rayon de recherche</label>
       <div class="curseur"><input id="rayon" type="range" min="200" max="2500" step="50"><output id="rayonVal"></output></div>
+      <label id="titreNoms">Noms sous les icônes</label>
+      <div class="segments" role="group" aria-labelledby="titreNoms">
+        <button type="button" data-noms="aucun" aria-pressed="false">Aucun</button>
+        <button type="button" data-noms="transports" aria-pressed="false">Transports</button>
+        <button type="button" data-noms="tous" aria-pressed="false">Tous</button>
+      </div>
+      <p class="aide">Pour toute la carte et le prochain pré-remplissage ; réglable icône par icône dans Sélection.</p>
       <div class="titre-cat"><span>Catégories</span><span>nombre max</span></div>
       <div id="categories"></div>
     </div>
@@ -417,6 +438,12 @@ const iconeEnLangue = (icone, langue) => {
   return m ? `ref_${m[1]}${langue === 'fr' ? '_fr' : ''}${m[3] || ''}` : icone;
 };
 const ORIENTATIONS = ['', '_g', '_b', '_bg', '_n'];
+// Nom sous l'icône : mesures en px de la carte 760 (×2 à l'export), communes à l'écran et à l'image.
+const ETIQUETTE = { taille: 12, interligne: 14, graisse: 600, largeurMax: 124, lignesMax: 2, ecart: 1, couleur: '#003B5C', halo: '#FFFFFF', halo_px: 3 };
+const POLICE_ETIQUETTE = '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+const policeEtiquette = (e = 1) => `${ETIQUETTE.graisse} ${ETIQUETTE.taille * e}px ${POLICE_ETIQUETTE}`;
+const POLITIQUES_NOMS = ['aucun', 'transports', 'tous'];
+const POSITIONS_NOM = { b: 'Dessous', h: 'Dessus', d: 'À droite', g: 'À gauche' };
 const LIBELLES_ORIENTATION = { '': 'haut-droite', '_g': 'gauche', '_b': 'bas', '_bg': 'bas-gauche', '_n': 'sans queue' };
 
 const local = {
@@ -424,6 +451,8 @@ const local = {
   set(k, v) { try { localStorage.setItem(k, v); } catch { /* navigation privée */ } },
   del(k) { try { localStorage.removeItem(k); } catch { /* idem */ } }
 };
+
+const politiqueNomsDefaut = () => { const v = local.get('spg_carte_noms'); return POLITIQUES_NOMS.includes(v) ? v : 'tous'; };
 
 function toast(msg, type = '', ms = 4500) {
   const t = document.createElement('div');
@@ -465,7 +494,7 @@ function nouvelEtat() {
   return {
     v: 1, rfp_id: '', langue: 'fr', adresse: '', commune: '', canton: '', npa: '',
     bien: null,
-    reglages: { mode: '', rayon_m: 700, quotas: {}, max_pois: 30 },
+    reglages: { mode: '', rayon_m: 700, quotas: {}, max_pois: 30, noms: politiqueNomsDefaut() },
     marqueurs: []
   };
 }
@@ -755,6 +784,118 @@ function trouver(id) {
   return app.etat.marqueurs.find(m => m.id === id) || null;
 }
 
+/* ---------- noms sous les icônes ---------- */
+const ctxMesure = document.createElement('canvas').getContext('2d');
+// Coupure en lignes calculée une seule fois, avec la même police que l'export : écran = image.
+function lignesEtiquette(texte) {
+  const t = String(texte || '').replace(/\s+/g, ' ').trim();
+  if (!t) return [];
+  ctxMesure.font = policeEtiquette();
+  const L = ETIQUETTE.largeurMax, larg = x => ctxMesure.measureText(x).width;
+  const couper = x => {
+    if (larg(x) <= L) return x;
+    while (x.length > 1 && larg(x + '…') > L) x = x.slice(0, -1);
+    return x.trimEnd() + '…';
+  };
+  const lignes = [];
+  let cur = '';
+  for (const mot of t.split(' ')) {
+    const essai = cur ? cur + ' ' + mot : mot;
+    if (!cur || larg(essai) <= L) cur = essai;
+    else { lignes.push(cur); cur = mot; }
+  }
+  if (cur) lignes.push(cur);
+  if (lignes.length > ETIQUETTE.lignesMax) {
+    const reste = lignes.slice(ETIQUETTE.lignesMax - 1).join(' ');
+    lignes.length = ETIQUETTE.lignesMax - 1;
+    lignes.push(larg(reste) <= L ? reste + '…' : reste);
+  }
+  return lignes.map(couper);
+}
+const avecNomPossible = m => m.id !== 'bien' && !RE_CARTOUCHE.test(m.icone);
+const etiquetteVisible = m => !!m.etiquette && avecNomPossible(m) && !!String(m.nom || '').trim();
+// Pré-remplissage et bouton « Noms sous les icônes » : logos et cartouches non concernés.
+function etiquetteParDefaut(m, politique) {
+  if (!avecNomPossible(m) || estLogo(m.icone) || !String(m.nom || '').trim()) return false;
+  return politique === 'tous' || (politique === 'transports' && m.type === 'transport');
+}
+// Place du nom par rapport à la boîte de l'icône (px de la carte, origine = coin haut gauche de l'icône),
+// collé à la partie visible de l'icône : utilisée telle quelle par l'écran et par l'export.
+function dispositionEtiquette(m, v, t, n) {
+  const H = n * ETIQUETTE.interligne, e = ETIQUETTE.ecart, b = v.boite;
+  const x0 = t.w * b.x0, x1 = t.w * b.x1, y0 = t.h * b.y0, y1 = t.h * b.y1, cy = (y0 + y1) / 2;
+  switch (m.etiquette_pos) {
+    case 'h': return { x: t.w / 2, top: y0 - e - H, align: 'center' };
+    case 'd': return { x: x1 + e + 2, top: cy - H / 2, align: 'left' };
+    case 'g': return { x: x0 - e - 2, top: cy - H / 2, align: 'right' };
+    default: return { x: t.w / 2, top: y1 + e, align: 'center' };
+  }
+}
+function poserEtiquette(vue, m) {
+  if (!vue || !vue.etiquette) return;
+  const el = vue.etiquette;
+  const lignes = etiquetteVisible(m) ? lignesEtiquette(m.nom) : [];
+  el.textContent = lignes.join('\n');
+  el.hidden = !lignes.length;
+  if (!lignes.length) return;
+  chargerVisuel(m.icone).then(v => {
+    const d = dispositionEtiquette(m, v, tailleAffichee(m, v), lignes.length);
+    // padding de 2 px de l'étiquette : le texte commence exactement à d.x à gauche / à droite
+    el.style.left = (d.align === 'left' ? d.x - 2 : d.align === 'right' ? d.x + 2 : d.x) + 'px';
+    el.style.top = d.top + 'px';
+    el.style.textAlign = d.align;
+    el.style.transform = d.align === 'left' ? 'none' : d.align === 'right' ? 'translateX(-100%)' : 'translateX(-50%)';
+  }).catch(() => {});
+}
+function rafraichirEtiquette(m) {
+  const vue = app.vues.get(m.id);
+  if (!vue) return;
+  poserEtiquette(vue, m);
+  vue.node.title = [m.nom, libellePalette(m.icone)].filter(Boolean).join(' · ');
+}
+function dessinerEtiquette(ctx, m, v, t, p, S) {
+  const lignes = etiquetteVisible(m) ? lignesEtiquette(m.nom) : [];
+  if (!lignes.length) return;
+  ctx.save();
+  ctx.font = policeEtiquette(S);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = ETIQUETTE.halo_px * S;
+  ctx.strokeStyle = ETIQUETTE.halo;
+  ctx.fillStyle = ETIQUETTE.couleur;
+  const d = dispositionEtiquette(m, v, t, lignes.length);
+  ctx.textAlign = d.align;
+  const ox = p.x - t.w / 2, oy = p.y - t.h / 2;
+  lignes.forEach((l, i) => {
+    const x = Math.round((ox + d.x) * S), y = Math.round((oy + d.top + (i + 0.5) * ETIQUETTE.interligne) * S);
+    ctx.strokeText(l, x, y);
+    ctx.fillText(l, x, y);
+  });
+  ctx.restore();
+}
+function majSegmentsNoms() {
+  document.querySelectorAll('.segments [data-noms]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.noms === app.etat.reglages.noms)));
+}
+// Applique un choix à toute la carte (annulable) et le garde pour le prochain pré-remplissage.
+function appliquerNoms(politique) {
+  if (!POLITIQUES_NOMS.includes(politique)) return;
+  app.etat.reglages.noms = politique;
+  local.set('spg_carte_noms', politique);
+  majSegmentsNoms();
+  const changes = [];
+  for (const m of app.etat.marqueurs) {
+    if (!avecNomPossible(m)) continue;
+    const n = estLogo(m.icone) ? (politique === 'aucun' ? false : !!m.etiquette) : etiquetteParDefaut(m, politique);
+    if (n !== !!m.etiquette) changes.push([m, n]);
+  }
+  if (!changes.length) return;
+  memoriser();
+  for (const [m, n] of changes) { m.etiquette = n; rafraichirEtiquette(m); }
+  marquerModifie();
+  majSelection();
+}
+
 function poserVisuel(vue, m) {
   const { node, img, zone } = vue;
   node.classList.remove('manquante');
@@ -764,6 +905,7 @@ function poserVisuel(vue, m) {
     img.style.width = t.w + 'px';
     img.style.height = t.h + 'px';
     Object.assign(zone.style, { width: t.w + 'px', height: t.h + 'px', clipPath: v.forme || 'none' });
+    poserEtiquette(vue, m);
   }).catch(() => {
     node.classList.add('manquante');
     node.title = `${libellePalette(m.icone)} — fichier absent du dépôt`;
@@ -782,13 +924,19 @@ function creerVue(m) {
   img.draggable = false;
   const zone = document.createElement('span');
   zone.className = 'zone';
-  node.append(img, zone);
+  const etiquette = document.createElement('span');
+  etiquette.className = 'etiquette';
+  etiquette.hidden = true;
+  etiquette.style.font = policeEtiquette();
+  etiquette.style.lineHeight = ETIQUETTE.interligne + 'px';
+  etiquette.style.color = ETIQUETTE.couleur;
+  node.append(img, zone, etiquette);
   const libre = !estBien || $('#pinLibre').checked;
   if (estBien && libre) node.classList.add('deverrouille');
   const marker = new mapboxgl.Marker({ element: node, anchor: 'center', draggable: libre })
     .setLngLat([m.lon, m.lat])
     .addTo(app.map);
-  const vue = { marker, node, img, zone };
+  const vue = { marker, node, img, zone, etiquette };
   poserVisuel(vue, m);
   marker.on('dragstart', () => { memoriser(); selectionner(m.id); });
   marker.on('dragend', () => {
@@ -924,6 +1072,68 @@ function majSelection() {
   titre.append(fort, petit);
   tete.append(vignette, titre);
   zone.appendChild(tete);
+  if (avecNomPossible(m)) {
+    // Nom sous l'icône : affichage et texte modifiables ; saisir un nom l'affiche.
+    const bloc = document.createElement('div');
+    bloc.className = 'sel-nom';
+    const lab = document.createElement('label');
+    lab.className = 'case';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.id = 'selAfficherNom';
+    cb.checked = !!m.etiquette;
+    lab.append(cb, document.createTextNode(' Afficher le nom sous l\'icône'));
+    const champ = document.createElement('input');
+    champ.type = 'text';
+    champ.id = 'selNom';
+    champ.value = m.nom || '';
+    champ.maxLength = 160;
+    champ.placeholder = 'Nom affiché';
+    champ.setAttribute('aria-label', 'Nom affiché sous l\'icône');
+    cb.addEventListener('change', () => {
+      memoriser();
+      m.etiquette = cb.checked;
+      rafraichirEtiquette(m);
+      marquerModifie();
+      if (cb.checked && !String(m.nom || '').trim()) champ.focus();
+    });
+    let memorise = false;
+    champ.addEventListener('focus', () => { memorise = false; });
+    champ.addEventListener('input', () => {
+      if (!memorise) { memoriser(); memorise = true; }
+      m.nom = champ.value.slice(0, 160);
+      if (!m.etiquette && m.nom.trim()) { m.etiquette = true; cb.checked = true; }
+      fort.textContent = m.nom || libellePalette(m.icone);
+      rafraichirEtiquette(m);
+      marquerModifie();
+    });
+    champ.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); champ.blur(); } });
+    // Position du nom : pour dégager un nom qui chevauche une icône voisine
+    const pos = document.createElement('div');
+    pos.className = 'segments';
+    pos.setAttribute('role', 'group');
+    pos.setAttribute('aria-label', 'Position du nom');
+    const majPos = () => pos.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.pos === (m.etiquette_pos || 'b'))));
+    for (const [cle, txt] of Object.entries(POSITIONS_NOM)) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.pos = cle;
+      b.textContent = txt;
+      b.addEventListener('click', () => {
+        if ((m.etiquette_pos || 'b') === cle) return;
+        memoriser();
+        if (cle === 'b') delete m.etiquette_pos; else m.etiquette_pos = cle;
+        if (!m.etiquette && String(m.nom || '').trim()) { m.etiquette = true; cb.checked = true; }
+        rafraichirEtiquette(m);
+        marquerModifie();
+        majPos();
+      });
+      pos.appendChild(b);
+    }
+    majPos();
+    bloc.append(lab, champ, pos);
+    zone.appendChild(bloc);
+  }
   if (m.id === 'bien') {
     ligne('Position', `${m.lat.toFixed(6)}, ${m.lon.toFixed(6)}`);
     ligne('Déplacement', $('#pinLibre').checked ? 'autorisé' : 'verrouillé');
@@ -1139,7 +1349,8 @@ function appliquerMode(cle) {
     mode: cle,
     rayon_m: m.rayon_m,
     max_pois: m.max_pois,
-    quotas: { ...(m.quotas || {}) }
+    quotas: { ...(m.quotas || {}) },
+    noms: app.etat.reglages.noms || politiqueNomsDefaut()
   };
   afficherReglages();
 }
@@ -1149,6 +1360,7 @@ function afficherReglages() {
   if (reg.mode && $('#mode').value !== reg.mode) $('#mode').value = reg.mode;
   $('#rayon').value = reg.rayon_m;
   $('#rayonVal').textContent = `${reg.rayon_m} m`;
+  majSegmentsNoms();
   const zone = $('#categories');
   zone.replaceChildren();
   for (const c of app.presets.categories) {
@@ -1314,7 +1526,7 @@ function marqueurValide(x) {
 function normaliserMarqueur(x, source) {
   const cible = x.cible && Number.isFinite(Number(x.cible.lon)) && Number.isFinite(Number(x.cible.lat))
     ? { lon: arrondi(Number(x.cible.lon), 6), lat: arrondi(Number(x.cible.lat), 6) } : null;
-  return {
+  const o = {
     // identifiants régénérés pour le pré-remplissage ; conservés pour une carte enregistrée
     id: source !== 'auto' && typeof x.id === 'string' && /^m[\w]{4,20}$/.test(x.id) ? x.id : uid(),
     icone: x.icone,
@@ -1327,6 +1539,11 @@ function normaliserMarqueur(x, source) {
     source: source || (x.source === 'auto' ? 'auto' : 'manuel'),
     ...(Number(x.taille) > 0 ? { taille: Math.max(8, Math.min(160, Number(x.taille))) } : {})
   };
+  // nom affiché : choix enregistré ; pré-remplissage = réglage « Noms sous les icônes » ; ancienne carte = masqué
+  o.etiquette = typeof x.etiquette === 'boolean' ? x.etiquette
+    : source === 'auto' ? etiquetteParDefaut(o, app.etat.reglages.noms) : false;
+  if (['h', 'd', 'g'].includes(x.etiquette_pos)) o.etiquette_pos = x.etiquette_pos;
+  return o;
 }
 
 const pause = ms => new Promise(ok => setTimeout(ok, ms));
@@ -1437,6 +1654,7 @@ async function composerImage() {
     const t = tailleAffichee(m, v);
     const p = map.project([m.lon, m.lat]);
     ctx.drawImage(v.img, Math.round((p.x - t.w / 2) * S), Math.round((p.y - t.h / 2) * S), t.w * S, t.h * S);
+    dessinerEtiquette(ctx, m, v, t, p, S); // juste après son icône : même superposition qu'à l'écran
   }
   let dataUrl;
   try {
@@ -1733,6 +1951,7 @@ function brancher() {
   });
   $('#btnPreremplir').addEventListener('click', () => { basculerTiroir(false); preremplir(); });
   $('#btnReglages').addEventListener('click', () => basculerTiroir());
+  document.querySelectorAll('.segments [data-noms]').forEach(b => b.addEventListener('click', () => appliquerNoms(b.dataset.noms)));
   $('#voileTiroir').addEventListener('click', () => basculerTiroir(false));
   $('#bandeauFermer').addEventListener('click', () => bandeau(''));
   $('#ongletIcones').addEventListener('click', () => choisirOnglet(false));
