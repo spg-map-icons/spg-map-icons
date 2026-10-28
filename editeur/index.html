@@ -1312,6 +1312,12 @@ function correspondancesLogos() {
       for (const mot of l.mots || []) {
         if (mot && nom.includes(' ' + mot + ' ') && 100 + mot.length > score) { score = 100 + mot.length; meilleur = l; }
       }
+      // lignes : toutes les lignes du lieu correspondent au motif (gare du Léman Express seul : L1-L6, sinon CFF)
+      if (l.lignes && Array.isArray(m.lignes) && m.lignes.length && score < 50) {
+        let re = null;
+        try { re = new RegExp(l.lignes); } catch { re = null; }
+        if (re && m.lignes.every(x => re.test(String(x)))) { score = 50; meilleur = l; }
+      }
       const zoneOk = !l.cantons || !l.cantons.length ? true : (!!canton && l.cantons.includes(canton));
       if (l.par_zone && score < 1 && zoneOk
           && (!l.communes || !l.communes.length || l.communes.some(c => commune && commune.includes(normaliserTexte(c))))) {

@@ -1151,14 +1151,13 @@
     "leman express"
    ],
    "categories": [
-    "gare",
-    "tram",
-    "bus"
+    "gare"
    ],
    "cantons": [
     "GE",
     "VD"
-   ]
+   ],
+   "lignes": "^L[1-6]$"
   },
   {
    "fichier": "logo-tl.svg",
