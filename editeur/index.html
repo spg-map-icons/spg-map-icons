@@ -140,6 +140,15 @@
   .grille-pal.refs .pal { aspect-ratio: 7 / 5; }
   .pal img { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
   .pal.arme { border-color: var(--rouge); box-shadow: 0 0 0 2px var(--rouge) inset; }
+  /* logos trouvés sur la carte : nombre de lieux, et état « posé » */
+  .pal .badge { position: absolute; right: 2px; top: 2px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--bleu); color: #fff; font-size: 11px; font-weight: 600; line-height: 18px; text-align: center; pointer-events: none; }
+  .pal.pose { border-color: var(--ok); }
+  .pal.pose .badge { background: var(--ok); }
+  .pal.pose .badge::before { content: "✓ "; }
+  .pal.trouve { cursor: pointer; }
+  #logosTrouves .aide, #logosAucun { margin: 4px 0 10px; }
+  #btnPoserLogos { width: 100%; margin: 8px 0 12px; }
+  #blocTousLogos { border-top: 1px solid var(--ligne); padding-top: 10px; margin-top: 4px; }
   .pal.absente { opacity: .35; }
   .recherche-logos { position: sticky; top: -14px; background: var(--carte); padding: 0 0 8px; margin-top: -2px; z-index: 1; }
   details.raccourcis summary { cursor: pointer; font-size: 12px; color: var(--doux); }
@@ -357,8 +366,21 @@
       <p class="aide">Glissez une icône sur la carte, ou cliquez-la puis cliquez la carte. <kbd>Maj</kbd> + clic : en poser plusieurs.</p>
     </div>
     <div class="panneau-corps" id="corpsLogos" role="tabpanel" hidden>
-      <div class="recherche-logos"><input id="filtreLogos" type="text" placeholder="Rechercher : Migros, HUG, EPFL…" autocomplete="off" aria-label="Rechercher un logo"></div>
-      <div id="paletteLogos" class="grille-pal logos"></div>
+      <div id="logosTrouves" hidden>
+        <div class="groupe-pal">Sur la carte</div>
+        <div id="paletteLogosTrouves" class="grille-pal logos"></div>
+        <p class="aide">Cliquez un logo : il remplace l'icône du lieu correspondant (le chiffre indique le nombre de lieux).</p>
+        <button id="btnPoserLogos" class="secondaire" type="button">Poser tous les logos trouvés</button>
+      </div>
+      <p class="aide" id="logosAucun">Aucun logo ne correspond aux lieux de la carte.</p>
+      <div id="blocTousLogos">
+        <label class="case"><input id="tousLogos" type="checkbox"> Tous les logos <span class="nb" id="nbTousLogos"></span></label>
+        <div id="listeTousLogos" hidden>
+          <p class="aide">À poser à la main : cliquez puis cliquez la carte, ou glissez.</p>
+          <div class="recherche-logos"><input id="filtreLogos" type="text" placeholder="Rechercher : Migros, HUG, EPFL…" autocomplete="off" aria-label="Rechercher un logo"></div>
+          <div id="paletteLogos" class="grille-pal logos"></div>
+        </div>
+      </div>
     </div>
     <div class="panneau-pied">
       <details class="raccourcis">
@@ -482,6 +504,7 @@ const app = {
   selection: null,
   arme: null,
   k: 1,                // échelle d'affichage du cadre (taille affichée / 760)
+  logosTrouves: null,  // correspondances logo ↔ lieux (recalculées à chaque changement de la carte)
   refusMapbox: [],     // horodatages des 401/403 Mapbox récents
   histo: [],
   futur: [],
@@ -502,7 +525,8 @@ function nouvelEtat() {
 /* ---------- icônes et logos ---------- */
 const RE_FICHIER = /\.(svg|png|jpe?g)$/i;           // logos : nom de fichier complet (logo-cff.svg)
 const RE_ICONE = /^[a-z0-9_\-]+(\.(svg|png|jpe?g))?$/i;
-const LOGO_MAX = { w: 140, h: 32 };                 // taille par défaut d'un logo, en px écran
+const LOGO_MAX = { w: 140, h: 32 };                 // taille par défaut d'un logo posé à la main, en px écran
+const LOGO_REMPLACE = { w: 104, h: 28 };            // logo qui remplace l'icône d'un lieu : proche de la taille des icônes
 const estLogo = icone => RE_FICHIER.test(icone);
 function iconeUrl(icone) {
   const fichier = estLogo(icone) ? icone : icone + '.png';
@@ -608,7 +632,8 @@ function chargerVisuel(icone) {
 function tailleAffichee(m, v) {
   if (estLogo(m.icone)) {
     const ratio = v.nw / v.nh;
-    let h = Number(m.taille) > 0 ? Number(m.taille) : Math.min(LOGO_MAX.h, LOGO_MAX.w / ratio);
+    const max = m.icone_origine ? LOGO_REMPLACE : LOGO_MAX;
+    let h = Number(m.taille) > 0 ? Number(m.taille) : Math.min(max.h, max.w / ratio);
     h = Math.max(8, Math.min(160, h));
     return { w: h * ratio, h };
   }
@@ -1140,6 +1165,7 @@ function majSelection() {
   } else {
     const o = m.icone.match(RE_CARTOUCHE);
     if (o) ligne('Orientation', LIBELLES_ORIENTATION[o[2] || '']);
+    if (m.icone_origine) ligne('Remplace', libellePalette(m.icone_origine));
     ligne('Origine', m.source === 'auto' ? 'pré-remplissage' : 'ajout manuel');
     if (m.cible) {
       const d = distanceM(m, m.cible);
@@ -1166,6 +1192,10 @@ function majSelection() {
     if (estLogo(m.icone)) {
       bouton('Plus petit', () => redimensionner(m.id, 0.85));
       bouton('Plus grand', () => redimensionner(m.id, 1.18));
+      if (m.icone_origine) bouton('Remettre l\'icône', () => remettreIcone(m.id));
+    } else if (app.logosTrouves?.parLieu.get(m.id)) {
+      const f = app.logosTrouves.parLieu.get(m.id);
+      bouton(`Poser le logo ${libellePalette(f)}`, () => poserLogo(f));
     }
     if (m.cible && distanceM(m, m.cible) >= 1) bouton('Remettre sur le lieu', () => remettreSurCible(m.id));
     bouton('Supprimer', () => supprimer(m.id), 'danger');
@@ -1240,6 +1270,7 @@ function majBoutons() {
   $('#infoIcones').textContent = ouvert ? `${n} icône${n > 1 ? 's' : ''}${app.modifie ? ' · non enregistré' : ' · enregistré'}` : '';
   $('#infoIcones').classList.toggle('modifie', ouvert && app.modifie);
   $('#accueil').hidden = !!app.etat.bien;
+  majLogosTrouves();
 }
 
 /* ---------- palette ---------- */
@@ -1249,6 +1280,132 @@ function armer(icone) {
   $('#carte').classList.toggle('carte-armee', !!app.arme);
 }
 function desarmer() { if (app.arme) armer(app.arme); }
+
+/* ---------- logos : correspondance avec les lieux de la carte ---------- */
+const normaliserTexte = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const CANTONS = { geneve: 'GE', geneva: 'GE', genf: 'GE', vaud: 'VD', waadt: 'VD', zurich: 'ZH', 'basel stadt': 'BS', 'bale ville': 'BS', basel: 'BS',
+  'basel landschaft': 'BL', 'bale campagne': 'BL', valais: 'VS', wallis: 'VS', fribourg: 'FR', freiburg: 'FR', neuchatel: 'NE', jura: 'JU',
+  bern: 'BE', berne: 'BE', ticino: 'TI', tessin: 'TI', luzern: 'LU', lucerne: 'LU', 'st gallen': 'SG', 'saint gall': 'SG', aargau: 'AG', argovie: 'AG', solothurn: 'SO', soleure: 'SO' };
+function cantonCarte() {
+  const c = normaliserTexte(app.etat.canton).replace(/^ch /, '');
+  if (/^[a-z]{2}$/.test(c)) return c.toUpperCase();
+  return CANTONS[c] || '';
+}
+const CATEGORIES_TRANSPORT = new Set(['autoroute', 'tram', 'gare', 'bus']);
+const categorieLieu = m => m.icone_origine || (estLogo(m.icone) ? '' : (m.categorie === 'reference_spg' ? '' : (m.categorie || m.icone)));
+// Un logo vaut pour un lieu si son nom contient un des mots du logo (mot entier), dans sa zone et ses catégories ;
+// les réseaux de transport (par_zone) valent pour tous les arrêts de leur zone. Le mot le plus long l'emporte (Coop City > Coop).
+function correspondancesLogos() {
+  const parLogo = new Map(), parLieu = new Map();
+  const logos = (app.presets?.logos || []).filter(l => estLogo(l.fichier) && RE_ICONE.test(l.fichier));
+  if (!logos.length) return { parLogo, parLieu };
+  const canton = cantonCarte(), commune = normaliserTexte(app.etat.commune);
+  for (const m of app.etat.marqueurs) {
+    const cat = categorieLieu(m);
+    if (!cat || RE_CARTOUCHE.test(m.icone)) continue; // références et logos posés à la main : rien à faire
+    const nom = ' ' + normaliserTexte(m.nom) + ' ';
+    let meilleur = null, score = 0;
+    for (const l of logos) {
+      if (l.cantons && l.cantons.length && canton && !l.cantons.includes(canton)) continue;
+      if (l.categories && l.categories.length && !l.categories.includes(cat)) continue;
+      for (const mot of l.mots || []) {
+        if (mot && nom.includes(' ' + mot + ' ') && 100 + mot.length > score) { score = 100 + mot.length; meilleur = l; }
+      }
+      const zoneOk = !l.cantons || !l.cantons.length ? true : (!!canton && l.cantons.includes(canton));
+      if (l.par_zone && score < 1 && zoneOk
+          && (!l.communes || !l.communes.length || l.communes.some(c => commune && commune.includes(normaliserTexte(c))))) {
+        score = 1; meilleur = l;
+      }
+    }
+    if (!meilleur) continue;
+    parLieu.set(m.id, meilleur.fichier);
+    if (!parLogo.has(meilleur.fichier)) parLogo.set(meilleur.fichier, []);
+    parLogo.get(meilleur.fichier).push(m.id);
+  }
+  return { parLogo, parLieu };
+}
+const logoPose = (m, fichier) => !!m && m.icone === fichier && !!m.icone_origine;
+// Remplace l'icône du lieu par le logo (le lieu garde son nom, sa position et son lieu réel ; annulable).
+function poserLogo(fichier, { tous = false } = {}) {
+  const ids = (app.logosTrouves?.parLogo.get(fichier) || []);
+  const aFaire = ids.map(id => trouver(id)).filter(m => m && !logoPose(m, fichier));
+  if (!ids.length) { armer(fichier); return 0; } // pas de lieu correspondant : pose à la main
+  if (!aFaire.length) { if (!tous) { selectionner(ids[0]); toast('Ce logo est déjà posé.'); } return 0; }
+  if (!tous) memoriser();
+  const reseau = !!(app.presets.logos.find(l => l.fichier === fichier) || {}).par_zone; // réseau (tpg, CFF…) : le nom de l'arrêt reste utile
+  for (const m of aFaire) {
+    if (!m.icone_origine) m.icone_origine = m.icone;
+    m.icone = fichier;
+    m.type = 'logo';
+    if (!reseau) { m.etiquette = false; delete m.etiquette_pos; }
+    delete m.taille;
+    const vue = app.vues.get(m.id);
+    if (vue) { poserVisuel(vue, m); vue.node.title = [m.nom, libellePalette(m.icone)].filter(Boolean).join(' · '); }
+  }
+  if (!tous) { marquerModifie(); selectionner(aFaire[aFaire.length - 1].id); toast(`${libellePalette(fichier)} posé sur ${aFaire.length} lieu${aFaire.length > 1 ? 'x' : ''}.`); }
+  return aFaire.length;
+}
+function poserTousLogos() {
+  const fichiers = [...(app.logosTrouves?.parLogo.keys() || [])];
+  memoriser();
+  let n = 0;
+  for (const f of fichiers) n += poserLogo(f, { tous: true });
+  if (!n) { app.histo.pop(); majBoutons(); toast('Tous les logos trouvés sont déjà posés.'); return; }
+  marquerModifie();
+  toast(`${n} logo${n > 1 ? 's' : ''} posé${n > 1 ? 's' : ''}.`);
+}
+function remettreIcone(id) {
+  const m = trouver(id);
+  if (!m || !m.icone_origine) return;
+  memoriser();
+  m.icone = m.icone_origine;
+  delete m.icone_origine;
+  delete m.taille;
+  m.type = CATEGORIES_TRANSPORT.has(m.categorie) ? 'transport' : 'poi';
+  m.etiquette = etiquetteParDefaut(m, app.etat.reglages.noms);
+  const vue = app.vues.get(id);
+  if (vue) { poserVisuel(vue, m); vue.node.title = [m.nom, libellePalette(m.icone)].filter(Boolean).join(' · '); }
+  marquerModifie();
+  majSelection();
+}
+// Onglet Logos : d'abord les logos qui ont un lieu sur la carte (avec le nombre), le reste sur demande.
+function majLogosTrouves() {
+  if (!app.presets) return;
+  const c = correspondancesLogos();
+  app.logosTrouves = c;
+  const etat = [...c.parLogo].map(([f, ids]) => f + ':' + ids.length + ':' + ids.filter(id => logoPose(trouver(id), f)).length).join('|');
+  if (etat === app.logosTrouvesEtat) return;
+  app.logosTrouvesEtat = etat;
+  const grille = $('#paletteLogosTrouves');
+  grille.replaceChildren();
+  for (const [f, ids] of c.parLogo) {
+    const el = elementPalette(f, libellePalette(f));
+    const poses = ids.filter(id => logoPose(trouver(id), f)).length;
+    const badge = document.createElement('span');
+    badge.className = 'badge';
+    badge.textContent = String(ids.length);
+    el.appendChild(badge);
+    el.classList.add('trouve');
+    el.classList.toggle('pose', poses === ids.length);
+    el.title = `${libellePalette(f)} — ${ids.map(id => trouver(id)?.nom || '').filter(Boolean).join(', ')}${poses === ids.length ? ' (posé)' : ''}`;
+    grille.appendChild(el);
+  }
+  const n = c.parLogo.size;
+  $('#logosTrouves').hidden = !n;
+  $('#logosAucun').hidden = !!n || !app.etat.bien;
+  $('#btnPoserLogos').disabled = ![...c.parLogo].some(([f, ids]) => ids.some(id => !logoPose(trouver(id), f)));
+  $('#nbLogos').textContent = n ? String(n) : '';
+  document.querySelectorAll('#paletteLogos .pal').forEach(p => {
+    const ids = c.parLogo.get(p.dataset.icone);
+    let badge = p.querySelector('.badge');
+    if (ids) {
+      if (!badge) { badge = document.createElement('span'); badge.className = 'badge'; p.appendChild(badge); }
+      badge.textContent = String(ids.length);
+      p.classList.add('trouve');
+      p.classList.toggle('pose', ids.every(id => logoPose(trouver(id), p.dataset.icone)));
+    } else if (badge) { badge.remove(); p.classList.remove('trouve', 'pose'); }
+  });
+}
 
 function elementPalette(icone, libelle) {
   // div plutôt que <button> : Firefox ne déclenche pas dragstart sur un bouton
@@ -1267,8 +1424,9 @@ function elementPalette(icone, libelle) {
   img.src = iconeUrl(icone);
   img.onerror = () => { b.classList.add('absente'); b.title = `${libelle} — fichier absent`; };
   b.appendChild(img);
-  b.addEventListener('click', () => armer(icone));
-  b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); armer(icone); } });
+  const agir = () => { if (estLogo(icone) && app.logosTrouves?.parLogo.has(icone)) poserLogo(icone); else armer(icone); };
+  b.addEventListener('click', agir);
+  b.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); agir(); } });
   b.addEventListener('dragstart', e => {
     e.dataTransfer.setData('text/x-spg-icone', icone);
     e.dataTransfer.effectAllowed = 'copy';
@@ -1301,8 +1459,10 @@ function construirePalette() {
     if (!RE_ICONE.test(l.fichier) || !estLogo(l.fichier)) continue;
     logos.appendChild(elementPalette(l.fichier, l.libelle));
   }
-  $('#nbLogos').textContent = logos.children.length ? String(logos.children.length) : '';
+  $('#nbTousLogos').textContent = logos.children.length ? `(${logos.children.length})` : '';
   filtrerLogos();
+  app.logosTrouvesEtat = null;
+  majLogosTrouves();
 }
 
 function choisirOnglet(logos) {
@@ -1310,7 +1470,7 @@ function choisirOnglet(logos) {
   $('#ongletLogos').setAttribute('aria-selected', String(logos));
   $('#corpsIcones').hidden = logos;
   $('#corpsLogos').hidden = !logos;
-  if (logos) setTimeout(() => $('#filtreLogos').focus(), 0);
+  if (logos && !$('#listeTousLogos').hidden) setTimeout(() => $('#filtreLogos').focus(), 0);
 }
 
 function filtrerLogos() {
@@ -1543,6 +1703,7 @@ function normaliserMarqueur(x, source) {
   o.etiquette = typeof x.etiquette === 'boolean' ? x.etiquette
     : source === 'auto' ? etiquetteParDefaut(o, app.etat.reglages.noms) : false;
   if (['h', 'd', 'g'].includes(x.etiquette_pos)) o.etiquette_pos = x.etiquette_pos;
+  if (estLogo(o.icone) && typeof x.icone_origine === 'string' && RE_ICONE.test(x.icone_origine) && !estLogo(x.icone_origine)) o.icone_origine = x.icone_origine;
   return o;
 }
 
@@ -1933,6 +2094,11 @@ function brancher() {
   $('#rfp').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); chargerRfp(); } });
   $('#rfp').addEventListener('change', () => { app.etat.rfp_id = $('#rfp').value.trim().toUpperCase(); });
   $('#filtreLogos').addEventListener('input', filtrerLogos);
+  $('#tousLogos').addEventListener('change', () => {
+    $('#listeTousLogos').hidden = !$('#tousLogos').checked;
+    if ($('#tousLogos').checked) setTimeout(() => $('#filtreLogos').focus(), 0);
+  });
+  $('#btnPoserLogos').addEventListener('click', poserTousLogos);
   $('#langue').addEventListener('change', () => { app.etat.langue = $('#langue').value; appliquerLangue(); });
   $('#mode').addEventListener('change', () => appliquerMode($('#mode').value));
   $('#rayon').addEventListener('input', () => {

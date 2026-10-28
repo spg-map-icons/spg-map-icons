@@ -1,6 +1,6 @@
 {
  "version": 1,
- "maj_le": "2026-10-23",
+ "maj_le": "2026-10-28",
  "note": "Source unique des préréglages : lu par l'éditeur et par RFP-08 (Fetch Map Presets). Quotas = nombre maximal par catégorie, dans l'ordre de priorité.",
  "mode_defaut": "bureaux",
  "categories": [
@@ -362,442 +362,1313 @@
   {
    "fichier": "logo-aldi.svg",
    "libelle": "Aldi",
-   "groupe": "Commerce"
+   "groupe": "Commerce",
+   "mots": [
+    "aldi",
+    "aldi suisse"
+   ],
+   "categories": [
+    "commerce",
+    "restaurant",
+    "station_service"
+   ]
   },
   {
    "fichier": "logo-aligro.svg",
    "libelle": "Aligro",
-   "groupe": "Commerce"
+   "groupe": "Commerce",
+   "mots": [
+    "aligro"
+   ],
+   "categories": [
+    "commerce",
+    "restaurant",
+    "station_service"
+   ],
+   "cantons": [
+    "GE",
+    "VD"
+   ]
   },
   {
    "fichier": "logo-coop.svg",
    "libelle": "Coop",
-   "groupe": "Commerce"
+   "groupe": "Commerce",
+   "mots": [
+    "coop"
+   ],
+   "categories": [
+    "commerce",
+    "restaurant",
+    "station_service"
+   ]
   },
   {
    "fichier": "logo-coop-city.png",
    "libelle": "Coop City",
-   "groupe": "Commerce"
+   "groupe": "Commerce",
+   "mots": [
+    "coop city"
+   ],
+   "categories": [
+    "commerce",
+    "restaurant",
+    "station_service"
+   ]
   },
   {
    "fichier": "logo-coop-pronto.svg",
    "libelle": "Coop Pronto",
-   "groupe": "Commerce"
+   "groupe": "Commerce",
+   "mots": [
+    "coop pronto"
+   ],
+   "categories": [
+    "commerce",
+    "restaurant",
+    "station_service"
+   ]
   },
   {
    "fichier": "logo-denner.svg",
    "libelle": "Denner",
-   "groupe": "Commerce"
+   "groupe": "Commerce",
+   "mots": [
+    "denner",
+    "denner express"
+   ],
+   "categories": [
+    "commerce",
+    "restaurant",
+    "station_service"
+   ]
   },
   {
    "fichier": "logo-globus.jpg",
    "libelle": "Globus",
-   "groupe": "Commerce"
+   "groupe": "Commerce",
+   "mots": [
+    "globus"
+   ],
+   "categories": [
+    "commerce",
+    "restaurant",
+    "station_service"
+   ]
   },
   {
    "fichier": "logo-ikea.svg",
    "libelle": "IKEA",
-   "groupe": "Commerce"
+   "groupe": "Commerce",
+   "mots": [
+    "ikea"
+   ],
+   "categories": [
+    "commerce",
+    "restaurant",
+    "station_service"
+   ]
   },
   {
    "fichier": "logo-landi.svg",
    "libelle": "Landi",
-   "groupe": "Commerce"
+   "groupe": "Commerce",
+   "mots": [
+    "landi"
+   ],
+   "categories": [
+    "commerce",
+    "restaurant",
+    "station_service"
+   ]
   },
   {
    "fichier": "logo-lidl.svg",
    "libelle": "Lidl",
-   "groupe": "Commerce"
+   "groupe": "Commerce",
+   "mots": [
+    "lidl"
+   ],
+   "categories": [
+    "commerce",
+    "restaurant",
+    "station_service"
+   ]
   },
   {
    "fichier": "logo-manor.svg",
    "libelle": "Manor",
-   "groupe": "Commerce"
+   "groupe": "Commerce",
+   "mots": [
+    "manor",
+    "manor food"
+   ],
+   "categories": [
+    "commerce",
+    "restaurant",
+    "station_service"
+   ]
   },
   {
    "fichier": "logo-migrolino.jpeg",
    "libelle": "Migrolino",
-   "groupe": "Commerce"
+   "groupe": "Commerce",
+   "mots": [
+    "migrolino"
+   ],
+   "categories": [
+    "commerce",
+    "restaurant",
+    "station_service"
+   ]
   },
   {
    "fichier": "logo-migros.svg",
    "libelle": "Migros",
-   "groupe": "Commerce"
+   "groupe": "Commerce",
+   "mots": [
+    "migros",
+    "migros daily",
+    "migros express",
+    "mmm"
+   ],
+   "categories": [
+    "commerce",
+    "restaurant",
+    "station_service"
+   ]
   },
   {
    "fichier": "logo-volg.jpeg",
    "libelle": "Volg",
-   "groupe": "Commerce"
+   "groupe": "Commerce",
+   "mots": [
+    "volg"
+   ],
+   "categories": [
+    "commerce",
+    "restaurant",
+    "station_service"
+   ]
   },
   {
    "fichier": "logo-amavita.svg",
    "libelle": "Amavita",
-   "groupe": "Pharmacie"
+   "groupe": "Pharmacie",
+   "mots": [
+    "amavita"
+   ],
+   "categories": [
+    "sante",
+    "commerce"
+   ]
   },
   {
    "fichier": "logo-benu.svg",
    "libelle": "Benu",
-   "groupe": "Pharmacie"
+   "groupe": "Pharmacie",
+   "mots": [
+    "benu"
+   ],
+   "categories": [
+    "sante",
+    "commerce"
+   ]
   },
   {
    "fichier": "logo-coop-vitality.svg",
    "libelle": "Coop Vitality",
-   "groupe": "Pharmacie"
+   "groupe": "Pharmacie",
+   "mots": [
+    "coop vitality"
+   ],
+   "categories": [
+    "sante",
+    "commerce"
+   ]
   },
   {
    "fichier": "logo-pharmacie-principale.jpg",
    "libelle": "Pharmacie Principale",
-   "groupe": "Pharmacie"
+   "groupe": "Pharmacie",
+   "mots": [
+    "pharmacie principale"
+   ],
+   "categories": [
+    "sante",
+    "commerce"
+   ],
+   "cantons": [
+    "GE"
+   ]
   },
   {
    "fichier": "logo-sunstore.svg",
    "libelle": "Sun Store",
-   "groupe": "Pharmacie"
+   "groupe": "Pharmacie",
+   "mots": [
+    "sun store",
+    "sunstore"
+   ],
+   "categories": [
+    "sante",
+    "commerce"
+   ],
+   "cantons": [
+    "GE",
+    "VD",
+    "VS",
+    "FR",
+    "NE",
+    "JU"
+   ]
   },
   {
    "fichier": "logo-toppharm.svg",
    "libelle": "TopPharm",
-   "groupe": "Pharmacie"
+   "groupe": "Pharmacie",
+   "mots": [
+    "toppharm"
+   ],
+   "categories": [
+    "sante",
+    "commerce"
+   ]
   },
   {
    "fichier": "logo-chuv.jpeg",
    "libelle": "CHUV",
-   "groupe": "Santé"
+   "groupe": "Santé",
+   "mots": [
+    "chuv",
+    "centre hospitalier universitaire vaudois"
+   ],
+   "categories": [
+    "hopital",
+    "sante"
+   ],
+   "cantons": [
+    "VD"
+   ]
   },
   {
    "fichier": "logo-claraspital.png",
    "libelle": "Claraspital",
-   "groupe": "Santé"
+   "groupe": "Santé",
+   "mots": [
+    "claraspital"
+   ],
+   "categories": [
+    "hopital",
+    "sante"
+   ],
+   "cantons": [
+    "BS"
+   ]
   },
   {
    "fichier": "logo-la-source.png",
    "libelle": "Clinique de La Source",
-   "groupe": "Santé"
+   "groupe": "Santé",
+   "mots": [
+    "clinique de la source"
+   ],
+   "categories": [
+    "hopital",
+    "sante"
+   ],
+   "cantons": [
+    "VD"
+   ]
   },
   {
    "fichier": "logo-ehnv.jpeg",
    "libelle": "eHnv – Hôpital d'Yverdon",
-   "groupe": "Santé"
+   "groupe": "Santé",
+   "mots": [
+    "ehnv",
+    "hopital d yverdon"
+   ],
+   "categories": [
+    "hopital",
+    "sante"
+   ],
+   "cantons": [
+    "VD"
+   ]
   },
   {
    "fichier": "logo-ehc.svg",
    "libelle": "Ensemble Hospitalier de la Côte (Hôpital de Morges)",
-   "groupe": "Santé"
+   "groupe": "Santé",
+   "mots": [
+    "ehc",
+    "hopital de morges"
+   ],
+   "categories": [
+    "hopital",
+    "sante"
+   ],
+   "cantons": [
+    "VD"
+   ]
   },
   {
    "fichier": "logo-ghol.jpeg",
    "libelle": "GHOL – Hôpital de Nyon",
-   "groupe": "Santé"
+   "groupe": "Santé",
+   "mots": [
+    "ghol",
+    "hopital de nyon"
+   ],
+   "categories": [
+    "hopital",
+    "sante"
+   ],
+   "cantons": [
+    "VD"
+   ]
   },
   {
    "fichier": "logo-hirslanden.jpeg",
    "libelle": "Hirslanden (Grangettes, La Colline, Bois-Cerf, Cecil)",
-   "groupe": "Santé"
+   "groupe": "Santé",
+   "mots": [
+    "hirslanden",
+    "clinique des grangettes",
+    "grangettes",
+    "clinique de la colline",
+    "bois cerf",
+    "clinique cecil"
+   ],
+   "categories": [
+    "hopital",
+    "sante"
+   ],
+   "cantons": [
+    "GE",
+    "VD",
+    "ZH"
+   ]
   },
   {
    "fichier": "logo-hug.jpeg",
    "libelle": "HUG – Hôpitaux universitaires de Genève",
-   "groupe": "Santé"
+   "groupe": "Santé",
+   "mots": [
+    "hug",
+    "hopitaux universitaires de geneve",
+    "hopital cantonal"
+   ],
+   "categories": [
+    "hopital",
+    "sante"
+   ],
+   "cantons": [
+    "GE"
+   ]
   },
   {
    "fichier": "logo-hopital-de-la-tour.jpeg",
    "libelle": "Hôpital de la Tour",
-   "groupe": "Santé"
+   "groupe": "Santé",
+   "mots": [
+    "hopital de la tour"
+   ],
+   "categories": [
+    "hopital",
+    "sante"
+   ],
+   "cantons": [
+    "GE"
+   ]
   },
   {
    "fichier": "logo-hrc.jpeg",
    "libelle": "Hôpital Riviera-Chablais (HRC)",
-   "groupe": "Santé"
+   "groupe": "Santé",
+   "mots": [
+    "hopital riviera chablais",
+    "hrc"
+   ],
+   "categories": [
+    "hopital",
+    "sante"
+   ],
+   "cantons": [
+    "VD"
+   ]
   },
   {
    "fichier": "logo-kispi.svg",
    "libelle": "Kinderspital Zürich",
-   "groupe": "Santé"
+   "groupe": "Santé",
+   "mots": [
+    "kinderspital",
+    "kispi"
+   ],
+   "categories": [
+    "hopital",
+    "sante"
+   ],
+   "cantons": [
+    "ZH"
+   ]
   },
   {
    "fichier": "logo-stadtspital-zuerich.svg",
    "libelle": "Stadtspital Zürich (Triemli, Waid)",
-   "groupe": "Santé"
+   "groupe": "Santé",
+   "mots": [
+    "stadtspital",
+    "triemli",
+    "waid"
+   ],
+   "categories": [
+    "hopital",
+    "sante"
+   ],
+   "cantons": [
+    "ZH"
+   ]
   },
   {
    "fichier": "logo-swiss-medical-network.svg",
    "libelle": "Swiss Medical Network (Générale-Beaulieu, Genolier…)",
-   "groupe": "Santé"
+   "groupe": "Santé",
+   "mots": [
+    "swiss medical network",
+    "clinique generale beaulieu",
+    "generale beaulieu",
+    "clinique de genolier",
+    "genolier",
+    "clinique de carouge"
+   ],
+   "categories": [
+    "hopital",
+    "sante"
+   ],
+   "cantons": [
+    "GE",
+    "VD"
+   ]
   },
   {
    "fichier": "logo-ukbb.jpeg",
    "libelle": "UKBB – hôpital pédiatrique de Bâle",
-   "groupe": "Santé"
+   "groupe": "Santé",
+   "mots": [
+    "ukbb"
+   ],
+   "categories": [
+    "hopital",
+    "sante"
+   ],
+   "cantons": [
+    "BS"
+   ]
   },
   {
    "fichier": "logo-usb.png",
    "libelle": "Universitätsspital Basel (USB)",
-   "groupe": "Santé"
+   "groupe": "Santé",
+   "mots": [
+    "universitatsspital basel",
+    "usb"
+   ],
+   "categories": [
+    "hopital",
+    "sante"
+   ],
+   "cantons": [
+    "BS"
+   ]
   },
   {
    "fichier": "logo-activ-fitness.svg",
    "libelle": "Activ Fitness",
-   "groupe": "Sport"
+   "groupe": "Sport",
+   "mots": [
+    "activ fitness"
+   ],
+   "categories": [
+    "fitness",
+    "piscine"
+   ]
   },
   {
    "fichier": "logo-holmes-place.jpeg",
    "libelle": "Holmes Place",
-   "groupe": "Sport"
+   "groupe": "Sport",
+   "mots": [
+    "holmes place"
+   ],
+   "categories": [
+    "fitness",
+    "piscine"
+   ],
+   "cantons": [
+    "GE",
+    "ZH"
+   ]
   },
   {
    "fichier": "logo-kieser.jpeg",
    "libelle": "Kieser Training",
-   "groupe": "Sport"
+   "groupe": "Sport",
+   "mots": [
+    "kieser"
+   ],
+   "categories": [
+    "fitness",
+    "piscine"
+   ]
   },
   {
    "fichier": "logo-letsgo.svg",
    "libelle": "Let's Go Fitness",
-   "groupe": "Sport"
+   "groupe": "Sport",
+   "mots": [
+    "let s go fitness",
+    "lets go fitness",
+    "let s go"
+   ],
+   "categories": [
+    "fitness",
+    "piscine"
+   ],
+   "cantons": [
+    "GE",
+    "VD",
+    "VS",
+    "FR",
+    "NE",
+    "JU"
+   ]
   },
   {
    "fichier": "logo-update-fitness.jpeg",
    "libelle": "Update Fitness",
-   "groupe": "Sport"
+   "groupe": "Sport",
+   "mots": [
+    "update fitness"
+   ],
+   "categories": [
+    "fitness",
+    "piscine"
+   ]
   },
   {
    "fichier": "logo-agrola.png",
    "libelle": "Agrola",
-   "groupe": "Station-service"
+   "groupe": "Station-service",
+   "mots": [
+    "agrola"
+   ],
+   "categories": [
+    "station_service",
+    "commerce"
+   ]
   },
   {
    "fichier": "logo-avia.svg",
    "libelle": "Avia",
-   "groupe": "Station-service"
+   "groupe": "Station-service",
+   "mots": [
+    "avia"
+   ],
+   "categories": [
+    "station_service",
+    "commerce"
+   ]
   },
   {
    "fichier": "logo-bp.svg",
    "libelle": "BP",
-   "groupe": "Station-service"
+   "groupe": "Station-service",
+   "mots": [
+    "bp"
+   ],
+   "categories": [
+    "station_service",
+    "commerce"
+   ]
   },
   {
    "fichier": "logo-eni.svg",
    "libelle": "Eni",
-   "groupe": "Station-service"
+   "groupe": "Station-service",
+   "mots": [
+    "eni"
+   ],
+   "categories": [
+    "station_service",
+    "commerce"
+   ]
   },
   {
    "fichier": "logo-migrol.svg",
    "libelle": "Migrol",
-   "groupe": "Station-service"
+   "groupe": "Station-service",
+   "mots": [
+    "migrol"
+   ],
+   "categories": [
+    "station_service",
+    "commerce"
+   ]
   },
   {
    "fichier": "logo-shell.svg",
    "libelle": "Shell",
-   "groupe": "Station-service"
+   "groupe": "Station-service",
+   "mots": [
+    "shell"
+   ],
+   "categories": [
+    "station_service",
+    "commerce"
+   ]
   },
   {
    "fichier": "logo-socar.png",
    "libelle": "Socar",
-   "groupe": "Station-service"
+   "groupe": "Station-service",
+   "mots": [
+    "socar"
+   ],
+   "categories": [
+    "station_service",
+    "commerce"
+   ]
   },
   {
    "fichier": "logo-tamoil.svg",
    "libelle": "Tamoil",
-   "groupe": "Station-service"
+   "groupe": "Station-service",
+   "mots": [
+    "tamoil"
+   ],
+   "categories": [
+    "station_service",
+    "commerce"
+   ]
   },
   {
    "fichier": "logo-flughafen-zuerich.svg",
    "libelle": "Aéroport de Zurich",
-   "groupe": "Transport"
+   "groupe": "Transport",
+   "mots": [
+    "flughafen zurich",
+    "zurich airport",
+    "zurich flughafen"
+   ],
+   "cantons": [
+    "ZH"
+   ]
   },
   {
    "fichier": "logo-bvb.svg",
    "libelle": "BVB – transports de Bâle",
-   "groupe": "Transport"
+   "groupe": "Transport",
+   "mots": [
+    "bvb"
+   ],
+   "categories": [
+    "bus",
+    "tram"
+   ],
+   "cantons": [
+    "BS"
+   ],
+   "par_zone": true
   },
   {
    "fichier": "logo-cff.svg",
    "libelle": "CFF – gares",
-   "groupe": "Transport"
+   "groupe": "Transport",
+   "mots": [
+    "sbb",
+    "cff",
+    "bahnhof",
+    "gare"
+   ],
+   "categories": [
+    "gare"
+   ],
+   "par_zone": true
   },
   {
    "fichier": "logo-cgn.jpeg",
    "libelle": "CGN – bateaux du Léman",
-   "groupe": "Transport"
+   "groupe": "Transport",
+   "mots": [
+    "cgn",
+    "debarcadere"
+   ],
+   "categories": [
+    "port",
+    "bus",
+    "tram"
+   ],
+   "cantons": [
+    "GE",
+    "VD"
+   ]
   },
   {
    "fichier": "logo-euroairport.svg",
    "libelle": "EuroAirport Bâle-Mulhouse",
-   "groupe": "Transport"
+   "groupe": "Transport",
+   "mots": [
+    "euroairport"
+   ],
+   "cantons": [
+    "BS"
+   ]
   },
   {
    "fichier": "logo-geneve-aeroport.svg",
    "libelle": "Genève Aéroport",
-   "groupe": "Transport"
+   "groupe": "Transport",
+   "mots": [
+    "geneve aeroport",
+    "aeroport de geneve",
+    "geneva airport",
+    "aeroport international de geneve"
+   ],
+   "cantons": [
+    "GE"
+   ]
   },
   {
    "fichier": "logo-leman-express.svg",
    "libelle": "Léman Express",
-   "groupe": "Transport"
+   "groupe": "Transport",
+   "mots": [
+    "leman express"
+   ],
+   "categories": [
+    "gare",
+    "tram",
+    "bus"
+   ],
+   "cantons": [
+    "GE",
+    "VD"
+   ]
   },
   {
    "fichier": "logo-tl.svg",
    "libelle": "tl – transports lausannois",
-   "groupe": "Transport"
+   "groupe": "Transport",
+   "mots": [
+    "tl"
+   ],
+   "categories": [
+    "bus",
+    "tram"
+   ],
+   "cantons": [
+    "VD"
+   ],
+   "communes": [
+    "Lausanne",
+    "Renens",
+    "Prilly",
+    "Pully",
+    "Épalinges",
+    "Crissier",
+    "Écublens",
+    "Chavannes-près-Renens",
+    "Le Mont-sur-Lausanne",
+    "Bussigny",
+    "Lutry",
+    "Paudex",
+    "Belmont-sur-Lausanne",
+    "Romanel-sur-Lausanne",
+    "Cheseaux-sur-Lausanne",
+    "Saint-Sulpice",
+    "Jouxtens-Mézery"
+   ],
+   "par_zone": true
   },
   {
    "fichier": "logo-tpg.svg",
    "libelle": "tpg – bus, trams, mouettes",
-   "groupe": "Transport"
+   "groupe": "Transport",
+   "mots": [
+    "tpg"
+   ],
+   "categories": [
+    "bus",
+    "tram"
+   ],
+   "cantons": [
+    "GE"
+   ],
+   "par_zone": true
   },
   {
    "fichier": "logo-vbz.svg",
    "libelle": "VBZ – transports de Zurich",
-   "groupe": "Transport"
+   "groupe": "Transport",
+   "mots": [
+    "vbz"
+   ],
+   "categories": [
+    "bus",
+    "tram"
+   ],
+   "cantons": [
+    "ZH"
+   ],
+   "communes": [
+    "Zürich"
+   ],
+   "par_zone": true
   },
   {
    "fichier": "logo-aiglon.png",
    "libelle": "Aiglon College",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "aiglon"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "VD"
+   ]
   },
   {
    "fichier": "logo-brillantmont.svg",
    "libelle": "Brillantmont International School",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "brillantmont"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "VD"
+   ]
   },
   {
    "fichier": "logo-champittet.png",
    "libelle": "Collège Champittet",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "champittet"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "VD"
+   ]
   },
   {
    "fichier": "logo-college-du-leman.png",
    "libelle": "Collège du Léman",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "college du leman"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "GE"
+   ]
   },
   {
    "fichier": "logo-ecal.png",
    "libelle": "ECAL",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "ecal"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "VD"
+   ]
   },
   {
    "fichier": "logo-ecolint.png",
    "libelle": "Ecolint – École internationale de Genève",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "ecolint",
+    "ecole internationale de geneve",
+    "international school of geneva"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "GE"
+   ]
   },
   {
    "fichier": "logo-ehl.png",
    "libelle": "EHL Hospitality Business School",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "ehl",
+    "ecole hoteliere de lausanne"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "VD"
+   ]
   },
   {
    "fichier": "logo-epfl.svg",
    "libelle": "EPFL",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "epfl"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "VD"
+   ]
   },
   {
    "fichier": "logo-eth.svg",
    "libelle": "ETH Zürich",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "eth"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "ZH"
+   ]
   },
   {
    "fichier": "logo-fhnw.svg",
    "libelle": "FHNW",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "fhnw"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "BS",
+    "BL",
+    "AG",
+    "SO"
+   ]
   },
   {
    "fichier": "logo-iheid.png",
    "libelle": "Geneva Graduate Institute (IHEID)",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "graduate institute",
+    "iheid",
+    "maison de la paix"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "GE"
+   ]
   },
   {
    "fichier": "logo-head.jpg",
    "libelle": "HEAD – Genève",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "head geneve",
+    "head"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "GE"
+   ]
   },
   {
    "fichier": "logo-heg-geneve.png",
    "libelle": "HEG Genève – Haute école de gestion",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "heg",
+    "haute ecole de gestion"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "GE"
+   ]
   },
   {
    "fichier": "logo-heig-vd.jpeg",
    "libelle": "HEIG-VD",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "heig vd"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "VD"
+   ]
   },
   {
    "fichier": "logo-hemu.png",
    "libelle": "HEMU – Haute école de musique",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "hemu"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "VD"
+   ]
   },
   {
    "fichier": "logo-hep-vaud.svg",
    "libelle": "HEP Vaud",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "hep vaud"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "VD"
+   ]
   },
   {
    "fichier": "logo-hepia.png",
    "libelle": "HEPIA",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "hepia"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "GE"
+   ]
   },
   {
    "fichier": "logo-imd.svg",
    "libelle": "IMD",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "imd"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "VD"
+   ]
   },
   {
    "fichier": "logo-florimont.svg",
    "libelle": "Institut Florimont",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "florimont"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "GE"
+   ]
   },
   {
    "fichier": "logo-le-rosey.png",
    "libelle": "Institut Le Rosey",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "le rosey"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "VD"
+   ]
   },
   {
    "fichier": "logo-isb.jpeg",
    "libelle": "International School Basel",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "international school basel",
+    "isb"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "BS",
+    "BL"
+   ]
   },
   {
    "fichier": "logo-isl.png",
    "libelle": "International School of Lausanne",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "international school of lausanne",
+    "isl"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "VD"
+   ]
   },
   {
    "fichier": "logo-unibas.png",
    "libelle": "Universität Basel",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "universitat basel"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "BS"
+   ]
   },
   {
    "fichier": "logo-uzh.svg",
    "libelle": "Universität Zürich (UZH)",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "universitat zurich",
+    "uzh"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "ZH"
+   ]
   },
   {
    "fichier": "logo-unige.svg",
    "libelle": "Université de Genève (UNIGE)",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "universite de geneve",
+    "unige",
+    "uni mail",
+    "uni bastions",
+    "uni dufour",
+    "uni carl vogt"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "GE"
+   ]
   },
   {
    "fichier": "logo-unil.png",
    "libelle": "Université de Lausanne (UNIL)",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "unil",
+    "universite de lausanne"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "VD"
+   ]
   },
   {
    "fichier": "logo-webster.png",
    "libelle": "Webster University Geneva",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "webster university"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "GE"
+   ]
   },
   {
    "fichier": "logo-zhaw.svg",
    "libelle": "ZHAW",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "zhaw"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "ZH"
+   ]
   },
   {
    "fichier": "logo-zhdk.png",
    "libelle": "ZHdK – Zürcher Hochschule der Künste",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "zhdk",
+    "toni areal"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "ZH"
+   ]
   },
   {
    "fichier": "logo-zis.svg",
    "libelle": "Zurich International School",
-   "groupe": "Éducation"
+   "groupe": "Éducation",
+   "mots": [
+    "zurich international school",
+    "zis"
+   ],
+   "categories": [
+    "ecole"
+   ],
+   "cantons": [
+    "ZH"
+   ]
   }
  ]
 }
