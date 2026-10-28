@@ -1165,6 +1165,7 @@ function majSelection() {
   } else {
     const o = m.icone.match(RE_CARTOUCHE);
     if (o) ligne('Orientation', LIBELLES_ORIENTATION[o[2] || '']);
+    if (Array.isArray(m.lignes) && m.lignes.length) ligne('Lignes', m.lignes.join(', '));
     if (m.icone_origine) ligne('Remplace', libellePalette(m.icone_origine));
     ligne('Origine', m.source === 'auto' ? 'pré-remplissage' : 'ajout manuel');
     if (m.cible) {
@@ -1704,6 +1705,10 @@ function normaliserMarqueur(x, source) {
     : source === 'auto' ? etiquetteParDefaut(o, app.etat.reglages.noms) : false;
   if (['h', 'd', 'g'].includes(x.etiquette_pos)) o.etiquette_pos = x.etiquette_pos;
   if (estLogo(o.icone) && typeof x.icone_origine === 'string' && RE_ICONE.test(x.icone_origine) && !estLogo(x.icone_origine)) o.icone_origine = x.icone_origine;
+  if (Array.isArray(x.lignes)) {
+    const l = x.lignes.map(v => String(v).trim()).filter(v => v && v.length <= 8).slice(0, 20);
+    if (l.length) o.lignes = l;
+  }
   return o;
 }
 
