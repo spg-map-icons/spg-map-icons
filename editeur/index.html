@@ -119,6 +119,9 @@
   .segments button:last-child { border-right: 0; }
   .segments button:hover:not(:disabled) { background: var(--survol); }
   .segments button[aria-pressed="true"]:not(:disabled) { background: var(--bleu); color: #fff; }
+  .puces { display: flex; flex-wrap: wrap; gap: 6px; }
+  .puces button { height: 30px; padding: 0 10px; border-radius: 15px; font-size: 12.5px; }
+  .puces button[aria-pressed="true"] { background: var(--bleu); border-color: var(--bleu); color: #fff; }
 
   /* Palette */
   .onglets { display: flex; gap: 4px; padding: 10px 16px 0; border-bottom: 1px solid var(--ligne); }
@@ -297,8 +300,9 @@
   <aside class="panneau gauche" id="panneauGauche" aria-label="Pré-remplissage">
     <div class="panneau-corps">
       <h2>Pré-remplissage</h2>
-      <label for="mode" style="margin-top:0">Type de bien</label>
-      <select id="mode"></select>
+      <label id="titreModes" style="margin-top:0">Type de bien <span class="aide" style="display:inline">(plusieurs possibles)</span></label>
+      <div id="modes" class="puces" role="group" aria-labelledby="titreModes"></div>
+      <input type="hidden" id="mode">
       <label for="rayon">Rayon de recherche</label>
       <div class="curseur"><input id="rayon" type="range" min="200" max="2500" step="50"><output id="rayonVal"></output></div>
       <label id="titreNoms">Noms sous les icônes</label>
@@ -474,7 +478,8 @@ const local = {
   del(k) { try { localStorage.removeItem(k); } catch { /* idem */ } }
 };
 
-const politiqueNomsDefaut = () => { const v = local.get('spg_carte_noms'); return POLITIQUES_NOMS.includes(v) ? v : 'tous'; };
+// Défaut « Transports » (choix de Léon, 28.10) ; le dernier choix de l'utilisateur est gardé par le navigateur.
+const politiqueNomsDefaut = () => { const v = local.get('spg_carte_noms2'); return POLITIQUES_NOMS.includes(v) ? v : 'transports'; };
 
 function toast(msg, type = '', ms = 4500) {
   const t = document.createElement('div');
@@ -906,7 +911,7 @@ function majSegmentsNoms() {
 function appliquerNoms(politique) {
   if (!POLITIQUES_NOMS.includes(politique)) return;
   app.etat.reglages.noms = politique;
-  local.set('spg_carte_noms', politique);
+  local.set('spg_carte_noms2', politique);
   majSegmentsNoms();
   const changes = [];
   for (const m of app.etat.marqueurs) {
@@ -1170,7 +1175,7 @@ function majSelection() {
     ligne('Origine', m.source === 'auto' ? 'pré-remplissage' : 'ajout manuel');
     if (m.cible) {
       const d = distanceM(m, m.cible);
-      ligne('Écart au lieu', d < 1 ? 'sur le lieu' : `${Math.round(d)} m`);
+      ligne('Écart au lieu', d < 1 ? 'sur le lieu' : `${Math.round(d)} m${d < 30 ? ' (poussée à côté d\'une voisine)' : ''}`);
     }
   }
   zone.appendChild(dl);
@@ -1497,26 +1502,65 @@ async function chargerPresets() {
     app.presets = { modes: {}, categories: [], palette: [] };
     bandeau(`presets.json illisible (${e.message}) : modes et palette indisponibles.`);
   }
-  const sel = $('#mode');
-  sel.replaceChildren();
+  const zoneModes = $('#modes');
+  zoneModes.replaceChildren();
   for (const [cle, m] of Object.entries(app.presets.modes)) {
-    const o = document.createElement('option');
-    o.value = cle; o.textContent = m.libelle || cle;
-    sel.appendChild(o);
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.dataset.mode = cle;
+    b.textContent = m.libelle || cle;
+    b.setAttribute('aria-pressed', 'false');
+    b.addEventListener('click', () => {
+      // un clic ajoute ou retire le type ; au moins un type reste choisi
+      const cles = modesChoisis();
+      const i = cles.indexOf(cle);
+      if (i >= 0) { if (cles.length === 1) return; cles.splice(i, 1); } else cles.push(cle);
+      appliquerMode(cles.join('+'));
+    });
+    zoneModes.appendChild(b);
   }
   construirePalette();
-  appliquerMode(app.presets.mode_defaut || sel.value);
+  appliquerMode(app.presets.mode_defaut || Object.keys(app.presets.modes)[0] || '');
 }
 
-function appliquerMode(cle) {
-  const m = app.presets.modes[cle];
-  if (!m) return;
-  $('#mode').value = cle;
+// Modes choisis : « residentiel+commercial » → ['residentiel', 'commercial'] (ordre de presets.json)
+function lireModes(texte) {
+  const ordre = Object.keys(app.presets?.modes || {});
+  const cles = String(texte || '').toLowerCase().split('+').map(x => x.trim()).filter(x => ordre.includes(x));
+  return [...new Set(cles)].sort((a, b) => ordre.indexOf(a) - ordre.indexOf(b));
+}
+const modesChoisis = () => lireModes(app.etat.reglages.mode);
+// Type de bien en clair (« Résidentiel + retail au RDC ») → tous les modes dont la règle correspond
+function modesDepuisType(texte) {
+  const t = String(texte || '').toLowerCase();
+  const cles = [];
+  for (const [motif, cible] of app.presets?.type_vers_mode || []) {
+    try { if (new RegExp(motif, 'i').test(t) && app.presets.modes[cible] && !cles.includes(cible)) cles.push(cible); } catch { /* motif invalide */ }
+  }
+  return cles;
+}
+// Plusieurs types de bien : quota maximal par catégorie, rayon et plafond maximaux (même règle que RFP-08)
+function combinerModes(cles) {
+  const r = { rayon_m: 0, max_pois: 0, quotas: {} };
+  for (const c of cles) {
+    const m = app.presets.modes[c];
+    r.rayon_m = Math.max(r.rayon_m, Number(m.rayon_m) || 0);
+    r.max_pois = Math.max(r.max_pois, Number(m.max_pois) || 0);
+    for (const [k, n] of Object.entries(m.quotas || {})) r.quotas[k] = Math.max(r.quotas[k] || 0, Number(n) || 0);
+  }
+  return r;
+}
+
+function appliquerMode(texte) {
+  const cles = lireModes(texte);
+  if (!cles.length) return;
+  const m = combinerModes(cles);
+  $('#mode').value = cles.join('+');
   app.etat.reglages = {
-    mode: cle,
+    mode: cles.join('+'),
     rayon_m: m.rayon_m,
     max_pois: m.max_pois,
-    quotas: { ...(m.quotas || {}) },
+    quotas: { ...m.quotas },
     noms: app.etat.reglages.noms || politiqueNomsDefaut()
   };
   afficherReglages();
@@ -1525,6 +1569,8 @@ function appliquerMode(cle) {
 function afficherReglages() {
   const reg = app.etat.reglages;
   if (reg.mode && $('#mode').value !== reg.mode) $('#mode').value = reg.mode;
+  const choisis = lireModes(reg.mode);
+  document.querySelectorAll('#modes button').forEach(b => b.setAttribute('aria-pressed', String(choisis.includes(b.dataset.mode))));
   $('#rayon').value = reg.rayon_m;
   $('#rayonVal').textContent = `${reg.rayon_m} m`;
   majSegmentsNoms();
@@ -1954,7 +2000,7 @@ function restaurerEtat(e) {
   $('#adresse').value = app.etat.adresse;
   $('#lieu').textContent = app.etat.adresse ? '● ' + app.etat.adresse : '';
   $('#lieu').title = app.etat.adresse || '';
-  if (app.presets.modes[app.etat.reglages.mode]) afficherReglages();
+  if (lireModes(app.etat.reglages.mode).length) afficherReglages();
   if (e.vue && Number.isFinite(e.vue.lon) && Number.isFinite(e.vue.zoom)) {
     app.map.jumpTo({ center: [e.vue.lon, e.vue.lat], zoom: e.vue.zoom, bearing: 0, pitch: 0 });
   } else {
@@ -1994,7 +2040,7 @@ async function chargerRfp() {
     const meta = rep.rfp || {};
     app.etat.rfp_id = rfp;
     app.etat.langue = langue;
-    if (meta.mode && app.presets.modes[meta.mode]) appliquerMode(meta.mode);
+    if (meta.mode) appliquerMode(lireModes(meta.mode).length ? meta.mode : modesDepuisType(meta.mode).join('+'));
     if (meta.adresse) {
       $('#adresse').value = meta.adresse;
       toast('Aucune carte enregistrée pour ce RFP : ouverture de son adresse.');
@@ -2111,7 +2157,6 @@ function brancher() {
   });
   $('#btnPoserLogos').addEventListener('click', poserTousLogos);
   $('#langue').addEventListener('change', () => { app.etat.langue = $('#langue').value; appliquerLangue(); });
-  $('#mode').addEventListener('change', () => appliquerMode($('#mode').value));
   $('#rayon').addEventListener('input', () => {
     app.etat.reglages.rayon_m = Number($('#rayon').value);
     $('#rayonVal').textContent = `${app.etat.reglages.rayon_m} m`;
@@ -2182,7 +2227,7 @@ async function demarrer() {
   if (!local.get('spg_carte_code')) demanderCode();
   const p = parametresUrl();
   if (p.get('langue') === 'en' || p.get('langue') === 'fr') { $('#langue').value = p.get('langue'); app.etat.langue = p.get('langue'); construirePalette(); }
-  if (p.get('mode') && app.presets.modes[p.get('mode')]) appliquerMode(p.get('mode'));
+  if (p.get('mode')) appliquerMode(lireModes(p.get('mode')).length ? p.get('mode') : modesDepuisType(p.get('mode')).join('+'));
   if (p.get('rfp')) $('#rfp').value = p.get('rfp');
   if (p.get('adresse')) $('#adresse').value = p.get('adresse');
   if (!app.map) return;

@@ -119,75 +119,75 @@
   "residentiel": {
    "libelle": "Résidentiel",
    "rayon_m": 900,
-   "max_pois": 45,
+   "max_pois": 60,
    "quotas": {
-    "gare": 2,
-    "tram": 4,
-    "bus": 5,
-    "commerce": 4,
-    "ecole": 4,
-    "restaurant": 6,
-    "sante": 2,
+    "gare": 3,
+    "tram": 6,
+    "bus": 8,
+    "commerce": 5,
+    "ecole": 5,
+    "restaurant": 8,
+    "sante": 3,
     "hopital": 2,
-    "fitness": 2,
+    "fitness": 3,
     "parc": 3,
-    "parking": 2,
-    "piscine": 1,
+    "parking": 3,
+    "piscine": 2,
     "autoroute": 1
    }
   },
   "bureaux": {
    "libelle": "Bureaux",
    "rayon_m": 700,
-   "max_pois": 45,
+   "max_pois": 60,
    "quotas": {
+    "gare": 3,
     "autoroute": 1,
-    "gare": 2,
-    "tram": 4,
-    "bus": 5,
-    "parking": 3,
-    "restaurant": 6,
-    "hotel": 3,
-    "commerce": 3,
-    "fitness": 2,
-    "sante": 1,
+    "tram": 6,
+    "bus": 8,
+    "parking": 4,
+    "restaurant": 8,
+    "hotel": 4,
+    "commerce": 4,
+    "fitness": 3,
+    "sante": 2,
     "parc": 2,
-    "ecole": 1,
+    "ecole": 2,
     "hopital": 1
    }
   },
   "commercial": {
    "libelle": "Commercial",
    "rayon_m": 800,
-   "max_pois": 40,
+   "max_pois": 50,
    "quotas": {
+    "gare": 3,
     "autoroute": 1,
-    "gare": 2,
-    "tram": 4,
-    "bus": 5,
-    "parking": 3,
-    "restaurant": 4,
-    "commerce": 3,
-    "fitness": 1,
-    "station_service": 1,
-    "sante": 1,
-    "parc": 1,
-    "hotel": 1
+    "tram": 6,
+    "bus": 8,
+    "parking": 4,
+    "restaurant": 6,
+    "commerce": 4,
+    "fitness": 2,
+    "station_service": 2,
+    "sante": 2,
+    "parc": 2,
+    "hotel": 2
    }
   },
   "industriel": {
    "libelle": "Industriel",
    "rayon_m": 1200,
-   "max_pois": 30,
+   "max_pois": 40,
    "quotas": {
+    "gare": 3,
     "autoroute": 2,
-    "station_service": 2,
-    "gare": 2,
-    "bus": 4,
-    "tram": 2,
-    "parking": 2,
-    "restaurant": 3,
-    "commerce": 1,
+    "station_service": 3,
+    "bus": 6,
+    "tram": 4,
+    "parking": 3,
+    "restaurant": 4,
+    "commerce": 2,
     "fitness": 1,
     "sante": 1
    }
@@ -199,16 +199,20 @@
    "industriel"
   ],
   [
-   "commerc|retail|arcade|magasin|boutique|vente",
+   "commerc|retail|arcade|magasin|boutique|vente|rdc|rez",
    "commercial"
   ],
   [
-   "r[ée]sid|logement|habitat|appartement|ppe",
+   "r[ée]sid|logement|habitat|appartement|ppe|mixte",
    "residentiel"
   ],
   [
    "bureau|office|administrat|laborat|cabinet|mixte",
    "bureaux"
+  ],
+  [
+   "mixte",
+   "commercial"
   ]
  ],
  "references": {
