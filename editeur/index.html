@@ -167,6 +167,8 @@
   .barre-int { display: flex; gap: 6px; align-items: center; width: 100%; }
   .barre .sep { width: 1px; height: 22px; background: var(--ligne); margin: 0 2px; flex: none; }
   .barre button:not(.primaire) { padding: 0 8px; }
+  .barre button[aria-pressed="true"]:not(:disabled) { background: var(--bleu); border-color: var(--bleu); color: #fff; }
+  .carte-parcelle .mapboxgl-canvas-container.mapboxgl-interactive { cursor: cell; }
   @container (max-width: 459px) { .barre-int { flex-wrap: wrap; gap: 4px; } .barre .sep { display: none; } }
   .barre .espace { flex: 1; }
   .barre .txt, .barre .txt-long { display: none; }
@@ -273,6 +275,8 @@
   <symbol id="i-moins" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-cible" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></symbol>
+  <symbol id="i-parcelle" viewBox="0 0 24 24"><path d="M4 7.5 10 4l10 4.5-6 3.5L4 7.5z"/><path d="M4 7.5V17l10 4 6-3.5V8.5"/><path d="M14 12v9"/></symbol>
+  <symbol id="i-parcelle-plus" viewBox="0 0 24 24"><path d="M4 7.5 10 4l10 4.5-6 3.5L4 7.5z"/><path d="M4 7.5V17l6 2.4"/><path d="M17 14v7M13.5 17.5h7"/></symbol>
   <symbol id="i-oeil" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
   <symbol id="i-calque" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5z"/><path d="m3 13 9 5 9-5"/></symbol>
   <symbol id="i-telecharger" viewBox="0 0 24 24"><path d="M12 4v11"/><path d="m7 10 5 5 5-5"/><path d="M5 20h14"/></symbol>
@@ -319,6 +323,7 @@
       <button id="btnPreremplir" class="secondaire" type="button">Pré-remplir la carte</button>
       <label class="case"><input id="adapterCadrage" type="checkbox" checked> Adapter le cadrage au résultat</label>
       <label class="case"><input id="pinLibre" type="checkbox"> Pin du bien déplaçable</label>
+      <label class="case"><input id="parcelleVisible" type="checkbox" checked> Mettre en évidence la parcelle</label>
       <p class="aide">Remplace les icônes automatiques ; les ajouts manuels restent.</p>
     </div>
   </aside>
@@ -335,6 +340,9 @@
           <button id="btnZoomMoins" class="carre" type="button" title="Dézoomer" aria-label="Dézoomer"><svg class="ico"><use href="#i-moins"/></svg></button>
           <button id="btnZoomPlus" class="carre" type="button" title="Zoomer" aria-label="Zoomer"><svg class="ico"><use href="#i-plus"/></svg></button>
           <button id="btnRecentrer" class="carre" type="button" title="Recentrer sur le pin" aria-label="Recentrer sur le pin" disabled><svg class="ico"><use href="#i-cible"/></svg></button>
+          <span class="sep"></span>
+          <button id="btnParcelle" class="carre" type="button" title="Afficher / masquer la parcelle du bien" aria-label="Parcelle" aria-pressed="true" disabled><svg class="ico"><use href="#i-parcelle"/></svg></button>
+          <button id="btnParcellePlus" class="carre" type="button" title="Ajouter ou retirer une parcelle : cliquez-la sur la carte" aria-label="Ajouter une parcelle" aria-pressed="false" disabled><svg class="ico"><use href="#i-parcelle-plus"/></svg></button>
           <span class="espace"></span>
           <button id="btnApercu" type="button" title="Aperçu de l'export" disabled><svg class="ico"><use href="#i-oeil"/></svg><span class="txt">Aperçu</span></button>
           <button id="btnCalque" type="button" title="Superposer l'export à la carte" disabled><svg class="ico"><use href="#i-calque"/></svg><span class="txt">Superposer</span></button>
@@ -446,6 +454,10 @@ const CONFIG = {
   // ce que Mapbox admet pour l'imprimé. Le logo Mapbox, lui, reste obligatoire sur l'image.
   EXPORT_ATTRIBUTION: false,
   GEOCODAGE_PERMANENT: true,      // l'état enregistré conserve les coordonnées du pin
+  // Parcelle cadastrale du bien : cadastre fédéral (CadastralWebMap, toute la Suisse), via api3.geo.admin.ch
+  PARCELLE_API: 'https://api3.geo.admin.ch/rest/services/api/MapServer/identify',
+  PARCELLE_COUCHE: 'ch.kantone.cadastralwebmap-farbe',
+  PARCELLE_STYLE: { remplissage: '#E4002B', opacite: 0.16, contour: '#E4002B', epaisseur: 2.5 },
   PRESETS_URL: 'presets.json',
   CENTRE_DEFAUT: [6.1432, 46.2044],
   DELAI_PREREMPLIR_MS: 180000,   // attente maximale du résultat (le pré-remplissage tourne en tâche de fond)
@@ -509,6 +521,7 @@ const app = {
   selection: null,
   arme: null,
   k: 1,                // échelle d'affichage du cadre (taille affichée / 760)
+  armeParcelle: false, // clic sur la carte = ajouter / retirer la parcelle cliquée
   logosTrouves: null,  // correspondances logo ↔ lieux (recalculées à chaque changement de la carte)
   refusMapbox: [],     // horodatages des 401/403 Mapbox récents
   histo: [],
@@ -523,7 +536,9 @@ function nouvelEtat() {
     v: 1, rfp_id: '', langue: 'fr', adresse: '', commune: '', canton: '', npa: '',
     bien: null,
     reglages: { mode: '', rayon_m: 700, quotas: {}, max_pois: 30, noms: politiqueNomsDefaut() },
-    marqueurs: []
+    marqueurs: [],
+    parcelles: [],            // parcelles cadastrales mises en évidence : { id, numero, canton, egrid, geometrie }
+    parcelle_visible: local.get('spg_carte_parcelle') !== 'non'
   };
 }
 
@@ -706,7 +721,7 @@ function initCarte() {
   map.touchZoomRotate.disableRotation();
   if (map.keyboard && typeof map.keyboard.disableRotation === 'function') map.keyboard.disableRotation();
   if (mapboxgl.AttributionControl) map.addControl(new mapboxgl.AttributionControl({ compact: true }), 'bottom-right');
-  map.on('style.load', () => retirerCouchesInvisibles(map));
+  map.on('style.load', () => { retirerCouchesInvisibles(map); poserCouchesParcelle(map); });
 
   map.on('load', () => {
     app.pret = true;
@@ -734,7 +749,10 @@ function initCarte() {
   });
   map.on('move', majInfoVue);
   map.on('click', e => {
-    if (app.arme) {
+    if (app.armeParcelle) {
+      basculerParcelleAuPoint(e.lngLat.lng, e.lngLat.lat);
+      if (!(e.originalEvent && e.originalEvent.shiftKey)) armerParcelle(false);
+    } else if (app.arme) {
       ajouterMarqueur(app.arme, e.lngLat);
       if (!(e.originalEvent && e.originalEvent.shiftKey)) desarmer();
     } else {
@@ -792,6 +810,117 @@ function ajusterCadre() {
   document.documentElement.style.setProperty('--cadre', S + 'px');
   document.documentElement.style.setProperty('--k', String(app.k));
   majInfoVue();
+}
+
+/* ---------- parcelle cadastrale ---------- */
+// Couches GL : remplissage + contour, au-dessus du fond, sous les marqueurs (qui sont des éléments HTML).
+function poserCouchesParcelle(map) {
+  try {
+    if (!map.getSource('parcelles')) map.addSource('parcelles', { type: 'geojson', data: donneesParcelles() });
+    const st = CONFIG.PARCELLE_STYLE;
+    if (!map.getLayer('parcelles-remplissage')) map.addLayer({ id: 'parcelles-remplissage', type: 'fill', source: 'parcelles',
+      paint: { 'fill-color': st.remplissage, 'fill-opacity': st.opacite } });
+    if (!map.getLayer('parcelles-contour')) map.addLayer({ id: 'parcelles-contour', type: 'line', source: 'parcelles',
+      paint: { 'line-color': st.contour, 'line-width': st.epaisseur }, layout: { 'line-join': 'round' } });
+  } catch (e) { console.warn('Couches parcelle :', e); }
+}
+function donneesParcelles() {
+  const visibles = app.etat.parcelle_visible !== false ? (app.etat.parcelles || []) : [];
+  return { type: 'FeatureCollection', features: visibles.filter(p => p && p.geometrie).map(p => ({ type: 'Feature', properties: { id: p.id }, geometry: p.geometrie })) };
+}
+function majParcelles() {
+  const map = app.map;
+  if (map && typeof map.getSource === 'function') {
+    const src = map.getSource('parcelles');
+    if (src && typeof src.setData === 'function') src.setData(donneesParcelles()); else poserCouchesParcelle(map);
+  }
+  const n = (app.etat.parcelles || []).length;
+  $('#btnParcelle').setAttribute('aria-pressed', String(app.etat.parcelle_visible !== false));
+  $('#parcelleVisible').checked = app.etat.parcelle_visible !== false;
+  $('#btnParcelle').title = n ? `${n > 1 ? n + ' parcelles' : 'Parcelle ' + (app.etat.parcelles[0].numero || '')} — afficher / masquer` : 'Aucune parcelle trouvée au pin';
+}
+// Cadastre fédéral : parcelle(s) sous un point. Réponse geo.admin « identify » (GeoJSON) ; polygone en lon/lat.
+async function chercherParcelle(lon, lat) {
+  const p = new URLSearchParams({ geometry: `${lon},${lat}`, geometryType: 'esriGeometryPoint', geometryFormat: 'geojson',
+    layers: 'all:' + CONFIG.PARCELLE_COUCHE, tolerance: '0', returnGeometry: 'true', sr: '4326', lang: 'fr' });
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 12000);
+  let r;
+  try { r = await fetch(CONFIG.PARCELLE_API + '?' + p, { signal: ctrl.signal }); } finally { clearTimeout(t); }
+  if (!r.ok) throw new Error(`Cadastre (geo.admin) : HTTP ${r.status}`);
+  const j = await r.json();
+  return (j.results || []).map(normaliserParcelle).filter(Boolean);
+}
+// Accepte une réponse geo.admin (geometry + properties) ou une parcelle déjà enregistrée (geometrie, numero…).
+function normaliserParcelle(f) {
+  const g = f && (f.geometrie || f.geometry || (f.properties && f.properties.geometry));
+  if (!g || !/^(Multi)?Polygon$/.test(g.type) || !Array.isArray(g.coordinates)) return null;
+  const pr = f.properties || f.attributes || f;
+  const egrid = String(pr.egris_egrid || pr.egrid || '').trim();
+  const numero = String(pr.number || pr.numero || pr.nummer || '').trim();
+  const canton = String(pr.ak || pr.canton || '').trim().toUpperCase();
+  const id = String(f.id && f.geometrie ? f.id : (egrid || `${f.layerBodId || 'p'}-${f.featureId || f.id || numero}`));
+  return { id, egrid, numero, canton, geometrie: { type: g.type, coordinates: g.coordinates } };
+}
+async function chargerParcelleDuBien() {
+  if (!app.etat.bien) return;
+  const bien = app.etat.bien;
+  try {
+    const liste = await chercherParcelle(bien.lon, bien.lat);
+    if (app.etat.bien !== bien) return; // une autre adresse a été ouverte entre-temps
+    app.etat.parcelles = liste.slice(0, 1);
+    majParcelles();
+    if (!liste.length) toast('Aucune parcelle cadastrale trouvée sous le pin (cadastre fédéral).', 'alerte', 6000);
+  } catch (e) {
+    console.warn('Parcelle :', e);
+    toast('Parcelle non chargée : ' + e.message, 'alerte', 6000);
+  }
+}
+// Mode « ajouter une parcelle » : un clic sur la carte ajoute la parcelle cliquée, ou la retire si elle y est déjà.
+function armerParcelle(actif) {
+  app.armeParcelle = actif === undefined ? !app.armeParcelle : !!actif;
+  if (app.armeParcelle) desarmer();
+  $('#btnParcellePlus').setAttribute('aria-pressed', String(app.armeParcelle));
+  $('#carte').classList.toggle('carte-parcelle', app.armeParcelle);
+}
+async function basculerParcelleAuPoint(lon, lat) {
+  try {
+    occupe(true, 'Recherche de la parcelle…');
+    const liste = await chercherParcelle(lon, lat);
+    if (!liste.length) { toast('Aucune parcelle à cet endroit.', 'alerte'); return; }
+    const p = liste[0];
+    memoriser();
+    const i = app.etat.parcelles.findIndex(x => x.id === p.id);
+    if (i >= 0) app.etat.parcelles.splice(i, 1); else app.etat.parcelles.push(p);
+    app.etat.parcelle_visible = true;
+    majParcelles();
+    marquerModifie();
+    toast(i >= 0 ? `Parcelle ${p.numero || ''} retirée.` : `Parcelle ${p.numero || ''} ajoutée (${app.etat.parcelles.length}).`);
+  } catch (e) {
+    toast(e.message, 'erreur', 6000);
+  } finally {
+    occupe(false);
+  }
+}
+// Export : la parcelle est dessinée sur le fond, sous les icônes (mêmes couleurs qu'à l'écran).
+function dessinerParcelles(ctx, map, S) {
+  if (app.etat.parcelle_visible === false) return;
+  const st = CONFIG.PARCELLE_STYLE;
+  for (const p of app.etat.parcelles || []) {
+    if (!p || !p.geometrie) continue;
+    const polys = p.geometrie.type === 'MultiPolygon' ? p.geometrie.coordinates : [p.geometrie.coordinates];
+    for (const anneaux of polys) {
+      ctx.beginPath();
+      for (const anneau of anneaux) {
+        anneau.forEach(([lon, lat], i) => { const q = map.project([lon, lat]); if (i === 0) ctx.moveTo(q.x * S, q.y * S); else ctx.lineTo(q.x * S, q.y * S); });
+        ctx.closePath();
+      }
+      ctx.save();
+      ctx.globalAlpha = st.opacite; ctx.fillStyle = st.remplissage; ctx.fill('evenodd');
+      ctx.globalAlpha = 1; ctx.strokeStyle = st.contour; ctx.lineWidth = st.epaisseur * S; ctx.lineJoin = 'round'; ctx.stroke();
+      ctx.restore();
+    }
+  }
 }
 
 function majInfoVue() {
@@ -1218,7 +1347,7 @@ function distanceM(a, b) {
 
 /* ---------- annuler / rétablir ---------- */
 function instantane() {
-  return JSON.stringify({ bien: app.etat.bien, marqueurs: app.etat.marqueurs });
+  return JSON.stringify({ bien: app.etat.bien, marqueurs: app.etat.marqueurs, parcelles: app.etat.parcelles, parcelle_visible: app.etat.parcelle_visible });
 }
 function memoriser() {
   app.histo.push(instantane());
@@ -1230,6 +1359,7 @@ function restaurer(s) {
   const o = JSON.parse(s);
   app.etat.bien = o.bien;
   app.etat.marqueurs = o.marqueurs;
+  if (Array.isArray(o.parcelles)) { app.etat.parcelles = o.parcelles; app.etat.parcelle_visible = o.parcelle_visible !== false; majParcelles(); }
   redessiner();
   marquerModifie();
 }
@@ -1267,6 +1397,8 @@ function majBoutons() {
   $('#btnAnnuler').disabled = !app.histo.length;
   $('#btnRetablir').disabled = !app.futur.length;
   $('#btnRecentrer').disabled = !ouvert;
+  $('#btnParcelle').disabled = !ouvert;
+  $('#btnParcellePlus').disabled = !ouvert;
   $('#btnPreremplir').disabled = !ouvert;
   $('#btnApercu').disabled = !ouvert;
   $('#btnCalque').disabled = !ouvert;
@@ -1282,6 +1414,7 @@ function majBoutons() {
 /* ---------- palette ---------- */
 function armer(icone) {
   app.arme = app.arme === icone ? null : icone;
+  if (app.arme && app.armeParcelle) armerParcelle(false);
   document.querySelectorAll('.pal').forEach(p => p.classList.toggle('arme', p.dataset.icone === app.arme));
   $('#carte').classList.toggle('carte-armee', !!app.arme);
 }
@@ -1692,8 +1825,10 @@ function ouvrirLieu(res, { preremplirAuto = true } = {}) {
   $('#lieu').title = res.libelle;
   cadrerSurRayon(res.lon, res.lat, reglages.rayon_m);
   redessiner();
+  majParcelles();
   app.modifie = true;
   majBoutons();
+  chargerParcelleDuBien();
   if (preremplirAuto) preremplir();
 }
 
@@ -1808,6 +1943,10 @@ async function preremplir() {
     memoriser();
     app.etat.marqueurs = app.etat.marqueurs.filter(m => m.source !== 'auto').concat(liste);
     redessiner();
+    if (!app.etat.parcelles.length && Array.isArray(rep.parcelles)) {
+      app.etat.parcelles = rep.parcelles.map(normaliserParcelle).filter(Boolean).slice(0, 1);
+      majParcelles();
+    }
     const bbox = rep.vue && Array.isArray(rep.vue.bbox) && rep.vue.bbox.length === 4 && rep.vue.bbox.every(Number.isFinite) ? rep.vue.bbox : null;
     if (bbox && $('#adapterCadrage').checked) {
       app.map.fitBounds([[bbox[0], bbox[1]], [bbox[2], bbox[3]]], { padding: 0, animate: false });
@@ -1862,6 +2001,7 @@ async function composerImage() {
   const ctx = canvas.getContext('2d');
   const fond = await chargerFond(vue.lon, vue.lat, vue.zoom);
   ctx.drawImage(fond.img, 0, 0, T * S, T * S);
+  dessinerParcelles(ctx, map, S);
 
   const elements = app.etat.marqueurs.slice().sort((a, b) => rangZ(a) - rangZ(b));
   if (app.etat.bien) elements.push({ id: 'bien', icone: 'bien', ...app.etat.bien });
@@ -1993,7 +2133,9 @@ function restaurerEtat(e) {
     adresse: e.adresse || '', commune: e.commune || '', canton: e.canton || '', npa: e.npa || '',
     bien: { lon: Number(e.bien.lon), lat: Number(e.bien.lat) },
     reglages: e.reglages && typeof e.reglages === 'object' ? { ...nouvelEtat().reglages, ...e.reglages } : nouvelEtat().reglages,
-    marqueurs: (Array.isArray(e.marqueurs) ? e.marqueurs : []).filter(marqueurValide).map(x => normaliserMarqueur(x))
+    marqueurs: (Array.isArray(e.marqueurs) ? e.marqueurs : []).filter(marqueurValide).map(x => normaliserMarqueur(x)),
+    parcelles: Array.isArray(e.parcelles) ? e.parcelles.map(normaliserParcelle).filter(Boolean) : [],
+    parcelle_visible: e.parcelle_visible !== false
   };
   $('#rfp').value = app.etat.rfp_id;
   $('#langue').value = app.etat.langue;
@@ -2008,6 +2150,8 @@ function restaurerEtat(e) {
   }
   app.histo = []; app.futur = [];
   redessiner();
+  majParcelles();
+  if (!Array.isArray(e.parcelles)) chargerParcelleDuBien(); // carte enregistrée avant les parcelles
   app.modifie = false;
   majBoutons();
   appliquerLangue(); // carte enregistrée avant les cartouches FR : mise en conformité (et à réenregistrer)
@@ -2119,7 +2263,7 @@ document.addEventListener('keydown', e => {
   const ctrl = e.ctrlKey || e.metaKey;
   if (ctrl && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); annuler(); return; }
   if (ctrl && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) { e.preventDefault(); retablir(); return; }
-  if (e.key === 'Escape') { desarmer(); selectionner(null); basculerTiroir(false); return; }
+  if (e.key === 'Escape') { desarmer(); armerParcelle(false); selectionner(null); basculerTiroir(false); return; }
   if (!app.selection) return;
   if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); supprimer(app.selection); return; }
   const pas = e.shiftKey ? 10 : 1;
@@ -2179,6 +2323,19 @@ function brancher() {
   $('#ongletIcones').addEventListener('click', () => choisirOnglet(false));
   $('#ongletLogos').addEventListener('click', () => choisirOnglet(true));
   $('#btnZoomPlus').addEventListener('click', () => app.map && app.map.zoomIn({ duration: 200 }));
+  // Afficher / masquer la parcelle : bouton de la barre et case du panneau, même réglage (enregistré avec la carte)
+  const reglerParcelle = (visible) => {
+    if (visible && !app.etat.parcelles.length && app.etat.bien) chargerParcelleDuBien();
+    if ((app.etat.parcelle_visible !== false) === visible) { majParcelles(); return; }
+    memoriser();
+    app.etat.parcelle_visible = visible;
+    local.set('spg_carte_parcelle', visible ? 'oui' : 'non'); // défaut des prochaines cartes
+    majParcelles();
+    marquerModifie();
+  };
+  $('#btnParcelle').addEventListener('click', () => reglerParcelle(app.etat.parcelle_visible === false));
+  $('#parcelleVisible').addEventListener('change', () => reglerParcelle($('#parcelleVisible').checked));
+  $('#btnParcellePlus').addEventListener('click', () => armerParcelle());
   $('#btnZoomMoins').addEventListener('click', () => app.map && app.map.zoomOut({ duration: 200 }));
   $('#btnAnnuler').addEventListener('click', annuler);
   $('#btnRetablir').addEventListener('click', retablir);
