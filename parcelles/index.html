@@ -260,8 +260,14 @@ function poserCouches() {
              'fill-opacity': ['case', etatBool('sel'), 0.22, etatBool('survol'), 0.16, 0.01] } });
   carte.addLayer({ id: 'parcelles-trait', type: 'line', source: 'parcelles', slot: 'middle', layout: { 'line-join': 'round' },
     paint: { 'line-color': ['case', etatBool('sel'), C.selection, etatBool('survol'), C.survol, C.trait],
-             'line-width': ['case', etatBool('sel'), 3, etatBool('survol'), 2.5, ['interpolate', ['linear'], ['zoom'], 15, 0.5, 17, 1, 19, 1.6]],
-             'line-opacity': ['case', etatBool('sel'), 1, etatBool('survol'), 1, ['interpolate', ['linear'], ['zoom'], 15, 0.55, 17, 0.85]] } });
+             // Mapbox : ['zoom'] doit être l'entrée d'un interpolate de premier niveau (sinon la couche est refusée)
+             'line-width': ['interpolate', ['linear'], ['zoom'],
+               15, ['case', etatBool('sel'), 2.5, etatBool('survol'), 2, 0.5],
+               17, ['case', etatBool('sel'), 3, etatBool('survol'), 2.5, 1],
+               19, ['case', etatBool('sel'), 3.5, etatBool('survol'), 3, 1.6]],
+             'line-opacity': ['interpolate', ['linear'], ['zoom'],
+               15, ['case', etatBool('sel'), 1, etatBool('survol'), 1, 0.55],
+               17, ['case', etatBool('sel'), 1, etatBool('survol'), 1, 0.85]] } });
   carte.addLayer({ id: 'parcelles-numeros', type: 'symbol', source: 'parcelles', slot: 'middle', minzoom: CONFIG.ZOOM_NUMEROS,
     layout: { 'text-field': ['to-string', ['get', 'NO_PARCELLE']], 'text-size': ['interpolate', ['linear'], ['zoom'], 17.5, 10, 20, 13],
               'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'], 'text-allow-overlap': false, 'text-padding': 1 },
