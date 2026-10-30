@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer-when-downgrade">
+<title>Parcelles Genève · SPG</title>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.31.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.31.0/mapbox-gl.js"></script>
+<style>
+  :root {
+    --bleu: #003B5C; --rouge: #E4002B; --texte: #1D1F29; --doux: #6B7177; --ligne: #DDE2E7;
+    --carte: #FFFFFF; --survol: #F2F5F8; --ombre: 0 2px 6px rgba(0,0,0,.15), 0 8px 24px rgba(0,0,0,.12);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body { font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: var(--texte); background: #E9EDF0; overflow: hidden; }
+  #carte { position: absolute; inset: 0; }
+  button { font: inherit; cursor: pointer; }
+  [hidden] { display: none !important; }
+
+  /* Recherche (coin haut gauche, comme Google Maps) */
+  .recherche { position: absolute; z-index: 5; top: 12px; left: 12px; width: min(400px, calc(100vw - 24px)); }
+  .recherche .boite { display: flex; align-items: center; background: var(--carte); border-radius: 24px; box-shadow: var(--ombre); height: 48px; padding: 0 6px 0 16px; gap: 8px; }
+  .recherche .marque { font-weight: 700; color: var(--bleu); white-space: nowrap; font-size: 13px; }
+  .recherche .marque span { color: var(--rouge); }
+  .recherche input { flex: 1; min-width: 0; border: 0; outline: 0; font: inherit; font-size: 15px; height: 100%; background: transparent; color: var(--texte); }
+  .recherche .btn-rond { width: 36px; height: 36px; border-radius: 50%; border: 0; background: transparent; color: var(--bleu); display: grid; place-items: center; }
+  .recherche .btn-rond:hover { background: var(--survol); }
+  .recherche .sep { width: 1px; height: 24px; background: var(--ligne); }
+  #resultats { list-style: none; margin: 8px 0 0; padding: 6px 0; background: var(--carte); border-radius: 12px; box-shadow: var(--ombre); max-height: 50vh; overflow-y: auto; }
+  #resultats li { padding: 9px 16px; cursor: pointer; display: flex; gap: 10px; align-items: baseline; }
+  #resultats li:hover, #resultats li.actif { background: var(--survol); }
+  #resultats li small { color: var(--doux); }
+  #resultats .vide { color: var(--doux); cursor: default; }
+  .ico { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* Fiche de la sélection (à droite) */
+  #fiche { position: absolute; z-index: 5; top: 12px; right: 12px; width: min(340px, calc(100vw - 24px)); max-height: calc(100vh - 120px); overflow-y: auto;
+    background: var(--carte); border-radius: 12px; box-shadow: var(--ombre); padding: 14px 16px; }
+  #fiche h2 { margin: 0 0 2px; font-size: 18px; color: var(--bleu); }
+  #fiche .sous { color: var(--doux); margin-bottom: 10px; }
+  #fiche dl { display: grid; grid-template-columns: 110px 1fr; gap: 4px 10px; margin: 0 0 12px; }
+  #fiche dt { color: var(--doux); }
+  #fiche dd { margin: 0; overflow-wrap: anywhere; }
+  #fiche .item { border-top: 1px solid var(--ligne); padding: 8px 0; display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+  #fiche .item:first-of-type { border-top: 0; }
+  #fiche .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  #fiche .actions a, #fiche .actions button { height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid var(--ligne); background: #fff; color: var(--bleu);
+    text-decoration: none; display: inline-flex; align-items: center; font-size: 13px; }
+  #fiche .actions a:hover, #fiche .actions button:hover { border-color: var(--bleu); }
+  #fiche .actions .principal { background: var(--bleu); border-color: var(--bleu); color: #fff; }
+  #fiche .fermer { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 50%; border: 0; background: transparent; color: var(--doux); font-size: 18px; }
+  #fiche .fermer:hover { background: var(--survol); }
+  .aide { color: var(--doux); font-size: 12px; margin: 8px 0 0; }
+
+  /* Bulle au survol */
+  #bulle { position: absolute; z-index: 6; pointer-events: none; background: var(--texte); color: #fff; padding: 6px 10px; border-radius: 8px; font-size: 13px;
+    white-space: nowrap; transform: translate(14px, 14px); box-shadow: 0 2px 8px rgba(0,0,0,.25); }
+  #bulle strong { font-size: 14px; }
+  #bulle span { opacity: .8; }
+
+  /* Bas de carte : fonds, état */
+  .bas { position: absolute; z-index: 5; left: 12px; bottom: 34px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; max-width: calc(100vw - 24px); }
+  .fonds { display: flex; background: var(--carte); border-radius: 18px; box-shadow: var(--ombre); padding: 3px; }
+  .fonds button { height: 30px; padding: 0 14px; border: 0; border-radius: 15px; background: transparent; color: var(--texte); font-size: 13px; }
+  .fonds button[aria-pressed="true"] { background: var(--bleu); color: #fff; }
+  .pastille { background: var(--carte); border-radius: 16px; box-shadow: var(--ombre); padding: 7px 12px; font-size: 12.5px; color: var(--texte); }
+  .pastille.alerte { background: #FFF4E5; color: #B54708; }
+  #toast { position: absolute; z-index: 7; left: 50%; bottom: 80px; transform: translateX(-50%); background: var(--texte); color: #fff; padding: 9px 14px; border-radius: 8px; font-size: 13px; box-shadow: var(--ombre); }
+
+  @media (hover: none) { .aide { display: none; } }
+  @media (max-width: 640px) {
+    #fiche { top: auto; bottom: 0; right: 0; left: 0; width: auto; max-height: 45vh; border-radius: 12px 12px 0 0; }
+    .bas { bottom: 34px; }
+    body.fiche-ouverte .bas { display: none; }
+  }
+</style>
+</head>
+<body>
+<div id="carte"></div>
+
+<div class="recherche">
+  <div class="boite">
+    <span class="marque">spg <span>·</span> parcelles</span>
+    <span class="sep"></span>
+    <input id="q" type="search" placeholder="Adresse, parcelle ou EGRID" autocomplete="off" aria-label="Rechercher une adresse, une parcelle ou un EGRID">
+    <button class="btn-rond" id="btnChercher" type="button" title="Rechercher" aria-label="Rechercher">
+      <svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    </button>
+  </div>
+  <ul id="resultats" role="listbox" hidden></ul>
+</div>
+
+<aside id="fiche" hidden aria-live="polite"></aside>
+<div id="bulle" hidden></div>
+
+<div class="bas">
+  <div class="fonds" role="group" aria-label="Fond de carte">
+    <button type="button" data-fond="plan" aria-pressed="true">Plan</button>
+    <button type="button" data-fond="satellite" aria-pressed="false">Satellite</button>
+  </div>
+  <span class="pastille" id="etat">Chargement…</span>
+</div>
+<div id="toast" hidden></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   Parcelles du canton de Genève sur fond de rues (Mapbox) — données SITG.
+   Source : couche CAD_PARCELLE_MENSU (mensuration officielle), service public du SITG,
+   Open Data (« utilisation libre, obligation d'indiquer la source »).
+   ===================================================================== */
+const CONFIG = {
+  MAPBOX_TOKEN: 'pk.eyJ1Ijoic3BnLWludGVyY2l0eSIsImEiOiJjbXZrcmlrY3kwcHY0MnlzNjhuYXJvbHZqIn0.eL7u4RtzxWgr0_hcZH8BWg',
+  FONDS: { plan: 'mapbox://styles/mapbox/standard', satellite: 'mapbox://styles/mapbox/standard-satellite' },
+  SITG: 'https://ge.ch/terags/rest/services/ECADASTRE_rdppf_map/MapServer/47/query',
+  CHAMPS: 'OBJECTID,NO_PARCELLE,EGRID,COMMUNE,NO_COMM,SURFACE,TYPE_PROPRI,PROPRI_PUBLIQUE,LIEN_WWW',
+  ZOOM_MIN: 15,          // en dessous : trop de parcelles, on invite à zoomer
+  ZOOM_TUILE: 15,        // grille de chargement (≈ 850 m de côté à Genève)
+  ZOOM_NUMEROS: 17.5,    // numéros écrits sur la carte à partir de ce zoom
+  CENTRE: [6.1466, 46.2033],
+  ZOOM: 16.5,
+  GENEVE: [5.95, 46.12, 6.32, 46.37],
+  COULEURS: { trait: '#8C2F39', survol: '#003B5C', selection: '#E4002B', numero: '#6B1F2A', halo: '#FFFFFF' },
+  COULEURS_SATELLITE: { trait: '#FFD166', survol: '#FFFFFF', selection: '#FF3B5C', numero: '#FFFFFF', halo: '#1D1F29' }
+};
+
+const $ = s => document.querySelector(s);
+let carte, survol = null, nbAffichees = 0;
+const cache = new Map();           // tuile "x/y" → { statut: 'charge' | 'ok' | 'erreur', features: [] }
+const selection = new Map();       // cle → feature
+let fond = 'plan';
+
+function toast(msg, ms = 3500) {
+  const t = $('#toast');
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, ms);
+}
+function etatF(id, st) {
+  try { if (carte && carte.getSource('parcelles')) carte.setFeatureState({ source: 'parcelles', id }, st); } catch { /* style en cours de rechargement */ }
+}
+const cleDe = p => p.EGRID || `${p.NO_COMM}-${p.NO_PARCELLE}` || String(p.OBJECTID);
+const m2 = n => Number.isFinite(Number(n)) ? Number(n).toLocaleString('fr-CH') + ' m²' : '—';
+
+/* ---------- SITG ---------- */
+async function requeteSitg(params, { signal } = {}) {
+  const base = { outFields: CONFIG.CHAMPS, returnGeometry: 'true', outSR: '4326', f: 'geojson', geometryPrecision: '7' };
+  const features = [];
+  for (let offset = 0, tours = 0; tours < 10; tours++) {
+    const p = new URLSearchParams({ ...base, ...params, resultOffset: String(offset), resultRecordCount: '2000' });
+    const r = await fetch(CONFIG.SITG + '?' + p, { signal });
+    if (!r.ok) throw new Error('SITG : HTTP ' + r.status);
+    const j = await r.json();
+    if (j.error) throw new Error('SITG : ' + (j.error.message || 'erreur'));
+    const f = (j.features || []).filter(x => x && x.geometry);
+    for (const x of f) { x.properties = x.properties || {}; x.properties.cle = cleDe(x.properties); }
+    features.push(...f);
+    const encore = j.exceededTransferLimit || (j.properties && j.properties.exceededTransferLimit);
+    if (!encore || !f.length) break;
+    offset += f.length;
+  }
+  return features;
+}
+const parcellesDansBbox = (b, opts) => requeteSitg({ where: '1=1', geometry: b.join(','), geometryType: 'esriGeometryEnvelope', inSR: '4326',
+  spatialRel: 'esriSpatialRelIntersects', maxAllowableOffset: '0.000002' }, opts);
+const parcellesAuPoint = (lon, lat) => requeteSitg({ where: '1=1', geometry: `${lon},${lat}`, geometryType: 'esriGeometryPoint', inSR: '4326',
+  spatialRel: 'esriSpatialRelIntersects' });
+const parcellesParWhere = where => requeteSitg({ where });
+
+/* ---------- tuiles de chargement ---------- */
+const lon2x = (lon, z) => Math.floor((lon + 180) / 360 * 2 ** z);
+const lat2y = (lat, z) => { const r = lat * Math.PI / 180; return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 2 ** z); };
+const x2lon = (x, z) => x / 2 ** z * 360 - 180;
+const y2lat = (y, z) => { const n = Math.PI - 2 * Math.PI * y / 2 ** z; return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n))); };
+function tuilesVisibles() {
+  const b = carte.getBounds(), z = CONFIG.ZOOM_TUILE;
+  const x0 = lon2x(b.getWest(), z), x1 = lon2x(b.getEast(), z), y0 = lat2y(b.getNorth(), z), y1 = lat2y(b.getSouth(), z);
+  const t = [];
+  for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) t.push([x, y]);
+  return t;
+}
+const dansGeneve = b => !(b.getEast() < CONFIG.GENEVE[0] || b.getWest() > CONFIG.GENEVE[2] || b.getNorth() < CONFIG.GENEVE[1] || b.getSouth() > CONFIG.GENEVE[3]);
+
+let enVol = 0;
+async function chargerVisibles() {
+  if (!carte) return;
+  const z = carte.getZoom(), b = carte.getBounds();
+  if (!dansGeneve(b)) { etat('Hors du canton de Genève : pas de parcelles SITG ici.', true); majSource(); return; }
+  if (z < CONFIG.ZOOM_MIN) { etat('Zoomez pour afficher les parcelles.'); majSource(); return; }
+  const a_charger = tuilesVisibles().filter(([x, y]) => !cache.has(x + '/' + y));
+  if (a_charger.length > 30) { etat('Zoomez pour afficher les parcelles.'); return; }
+  if (!a_charger.length) { majSource(); etatParcelles(); return; }
+  etat('Chargement des parcelles…');
+  let echecs = 0;
+  await Promise.all(a_charger.map(async ([x, y]) => {
+    const cle = x + '/' + y;
+    cache.set(cle, { statut: 'charge', features: [] });
+    enVol++;
+    try {
+      const bbox = [x2lon(x, CONFIG.ZOOM_TUILE), y2lat(y + 1, CONFIG.ZOOM_TUILE), x2lon(x + 1, CONFIG.ZOOM_TUILE), y2lat(y, CONFIG.ZOOM_TUILE)];
+      const f = await parcellesDansBbox(bbox);
+      cache.set(cle, { statut: 'ok', features: f, t: Date.now() });
+    } catch (e) {
+      console.warn('Tuile', cle, e);
+      cache.delete(cle); // nouvel essai au prochain déplacement, ou automatiquement dans 8 s
+      echecs++;
+    } finally {
+      enVol--;
+      majSource();
+    }
+  }));
+  purgerCache();
+  if (echecs) {
+    etat('Cadastre SITG momentanément injoignable : nouvel essai dans quelques secondes.', true);
+    clearTimeout(chargerVisibles.reessai); chargerVisibles.reessai = setTimeout(chargerVisibles, 8000);
+  } else if (!enVol) etatParcelles();
+}
+// Garde les 60 tuiles les plus récentes (≈ 20 Mo au plus en centre-ville)
+function purgerCache() {
+  if (cache.size <= 60) return;
+  const visibles = new Set(tuilesVisibles().map(([x, y]) => x + '/' + y));
+  [...cache.entries()].filter(([k, v]) => !visibles.has(k) && v.statut === 'ok').sort((a, b) => a[1].t - b[1].t)
+    .slice(0, cache.size - 60).forEach(([k]) => cache.delete(k));
+}
+// Source = union des tuiles visibles (sans doublons) + parcelles sélectionnées
+function majSource() {
+  const src = carte && carte.getSource('parcelles');
+  if (!src) return;
+  const vues = new Map();
+  if (carte.getZoom() >= CONFIG.ZOOM_MIN) {
+    for (const [x, y] of tuilesVisibles()) {
+      const t = cache.get(x + '/' + y);
+      if (t && t.features) for (const f of t.features) vues.set(f.properties.cle, f);
+    }
+  }
+  for (const [k, f] of selection) vues.set(k, f);
+  nbAffichees = vues.size;
+  src.setData({ type: 'FeatureCollection', features: [...vues.values()] });
+  for (const k of selection.keys()) etatF(k, { sel: true });
+}
+function etat(msg, alerte = false) { const e = $('#etat'); e.textContent = msg; e.classList.toggle('alerte', alerte); }
+function etatParcelles() {
+  if (carte.getZoom() < CONFIG.ZOOM_MIN) return etat('Zoomez pour afficher les parcelles.');
+  etat(nbAffichees ? `${nbAffichees.toLocaleString('fr-CH')} parcelles · survolez pour le numéro, cliquez pour la fiche` : 'Parcelles SITG');
+}
+
+/* ---------- couches ---------- */
+function poserCouches() {
+  const C = fond === 'satellite' ? CONFIG.COULEURS_SATELLITE : CONFIG.COULEURS;
+  try {
+    for (const [prop, val] of [['show3dObjects', false], ['show3dBuildings', false], ['show3dTrees', false], ['show3dLandmarks', false]]) {
+      try { carte.setConfigProperty('basemap', prop, val); } catch { /* propriété absente de ce fond */ }
+    }
+  } catch { /* fond sans configuration */ }
+  if (!carte.getSource('parcelles')) carte.addSource('parcelles', { type: 'geojson', data: { type: 'FeatureCollection', features: [] }, promoteId: 'cle' });
+  const etatBool = (nom) => ['boolean', ['feature-state', nom], false];
+  carte.addLayer({ id: 'parcelles-fond', type: 'fill', source: 'parcelles', slot: 'middle',
+    paint: { 'fill-color': ['case', etatBool('sel'), C.selection, etatBool('survol'), C.survol, '#ffffff'],
+             'fill-opacity': ['case', etatBool('sel'), 0.22, etatBool('survol'), 0.16, 0.01] } });
+  carte.addLayer({ id: 'parcelles-trait', type: 'line', source: 'parcelles', slot: 'middle', layout: { 'line-join': 'round' },
+    paint: { 'line-color': ['case', etatBool('sel'), C.selection, etatBool('survol'), C.survol, C.trait],
+             'line-width': ['case', etatBool('sel'), 3, etatBool('survol'), 2.5, ['interpolate', ['linear'], ['zoom'], 15, 0.5, 17, 1, 19, 1.6]],
+             'line-opacity': ['case', etatBool('sel'), 1, etatBool('survol'), 1, ['interpolate', ['linear'], ['zoom'], 15, 0.55, 17, 0.85]] } });
+  carte.addLayer({ id: 'parcelles-numeros', type: 'symbol', source: 'parcelles', slot: 'middle', minzoom: CONFIG.ZOOM_NUMEROS,
+    layout: { 'text-field': ['to-string', ['get', 'NO_PARCELLE']], 'text-size': ['interpolate', ['linear'], ['zoom'], 17.5, 10, 20, 13],
+              'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'], 'text-allow-overlap': false, 'text-padding': 1 },
+    paint: { 'text-color': C.numero, 'text-halo-color': C.halo, 'text-halo-width': 1.4 } });
+  majSource();
+}
+
+/* ---------- survol et sélection ---------- */
+function brancherInteractions() {
+  const bulle = $('#bulle');
+  carte.on('mousemove', 'parcelles-fond', e => {
+    const f = e.features && e.features[0];
+    if (!f) return;
+    if (survol !== f.id) {
+      if (survol !== null) etatF(survol, { survol: false });
+      survol = f.id;
+      etatF(survol, { survol: true });
+      const p = f.properties;
+      bulle.innerHTML = '';
+      const s = document.createElement('strong'); s.textContent = `Parcelle ${p.NO_PARCELLE ?? '?'}`;
+      const d = document.createElement('span'); d.textContent = ` · ${p.COMMUNE || ''} · ${m2(p.SURFACE)}`;
+      bulle.append(s, d);
+    }
+    bulle.style.left = e.point.x + 'px';
+    bulle.style.top = e.point.y + 'px';
+    bulle.hidden = false;
+    carte.getCanvas().style.cursor = 'pointer';
+  });
+  carte.on('mouseleave', 'parcelles-fond', () => {
+    if (survol !== null) etatF(survol, { survol: false });
+    survol = null;
+    bulle.hidden = true;
+    carte.getCanvas().style.cursor = '';
+  });
+  carte.on('click', 'parcelles-fond', e => {
+    const f = e.features && e.features[0];
+    if (!f) return;
+    const brut = trouverFeature(f.id) || { type: 'Feature', properties: f.properties, geometry: f.geometry };
+    basculerSelection(brut, e.originalEvent && (e.originalEvent.shiftKey || e.originalEvent.ctrlKey || e.originalEvent.metaKey));
+  });
+}
+function trouverFeature(cle) {
+  if (selection.has(cle)) return selection.get(cle);
+  for (const t of cache.values()) { const f = t.features && t.features.find(x => x.properties.cle === cle); if (f) return f; }
+  return null;
+}
+function basculerSelection(f, ajouter) {
+  const k = f.properties.cle;
+  if (!ajouter) {
+    for (const old of selection.keys()) if (old !== k) etatF(old, { sel: false });
+    const deja = selection.has(k) && selection.size === 1;
+    selection.clear();
+    if (!deja) selection.set(k, f);
+  } else if (selection.has(k)) {
+    selection.delete(k);
+  } else {
+    selection.set(k, f);
+  }
+  etatF(k, { sel: selection.has(k) });
+  majSource();
+  afficherFiche();
+  majLien();
+}
+function viderSelection() {
+  for (const k of selection.keys()) etatF(k, { sel: false });
+  selection.clear();
+  majSource();
+  afficherFiche();
+  majLien();
+}
+
+/* ---------- fiche ---------- */
+function afficherFiche() {
+  const fiche = $('#fiche');
+  document.body.classList.toggle('fiche-ouverte', selection.size > 0);
+  if (!selection.size) { fiche.hidden = true; return; }
+  fiche.hidden = false;
+  fiche.replaceChildren();
+  const fermer = document.createElement('button');
+  fermer.className = 'fermer'; fermer.type = 'button'; fermer.textContent = '×'; fermer.title = 'Fermer (Échap)';
+  fermer.addEventListener('click', viderSelection);
+  fiche.appendChild(fermer);
+  const liste = [...selection.values()].map(f => f.properties);
+  const actions = document.createElement('div'); actions.className = 'actions';
+  const bouton = (txt, fn, principal) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = txt; if (principal) b.className = 'principal'; b.addEventListener('click', fn); actions.appendChild(b); return b; };
+  const lienFoncier = (p, txt) => { if (!p.LIEN_WWW) return; const a = document.createElement('a'); a.href = p.LIEN_WWW; a.target = '_blank'; a.rel = 'noopener'; a.textContent = txt; actions.appendChild(a); };
+  if (liste.length === 1) {
+    const p = liste[0];
+    const h = document.createElement('h2'); h.textContent = `Parcelle ${p.NO_PARCELLE ?? '?'}`;
+    const s = document.createElement('div'); s.className = 'sous'; s.textContent = p.COMMUNE || '';
+    const dl = document.createElement('dl');
+    const ligne = (k, v) => { if (v === null || v === undefined || v === '') return; const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); };
+    ligne('Surface', m2(p.SURFACE));
+    ligne('Propriété', p.TYPE_PROPRI);
+    ligne('Propriétaire public', p.PROPRI_PUBLIQUE);
+    ligne('EGRID', p.EGRID);
+    fiche.append(h, s, dl);
+    lienFoncier(p, 'Extrait du registre foncier');
+    if (p.EGRID) bouton('Copier l\'EGRID', () => copier(p.EGRID, 'EGRID copié.'));
+  } else {
+    const total = liste.reduce((t, p) => t + (Number(p.SURFACE) || 0), 0);
+    const h = document.createElement('h2'); h.textContent = `${liste.length} parcelles`;
+    const s = document.createElement('div'); s.className = 'sous'; s.textContent = `Surface totale ${m2(total)}`;
+    fiche.append(h, s);
+    for (const p of liste) {
+      const it = document.createElement('div'); it.className = 'item';
+      const g = document.createElement('div'); g.textContent = `${p.NO_PARCELLE ?? '?'} · ${p.COMMUNE || ''}`;
+      const d = document.createElement('small'); d.textContent = m2(p.SURFACE);
+      it.append(g, d);
+      fiche.appendChild(it);
+    }
+  }
+  bouton('Copier la liste', () => copier(['Commune\tParcelle\tEGRID\tSurface (m²)\tPropriété', ...liste.map(p => [p.COMMUNE, p.NO_PARCELLE, p.EGRID, p.SURFACE, p.TYPE_PROPRI].join('\t'))].join('\n'), 'Liste copiée (à coller dans Excel).'), liste.length > 1);
+  bouton('Copier le lien', () => copier(location.href, 'Lien copié : il rouvre la carte avec cette sélection.'));
+  bouton('Cadrer', () => cadrerSur([...selection.values()]));
+  fiche.appendChild(actions);
+  const aide = document.createElement('p'); aide.className = 'aide';
+  aide.textContent = 'Maj + clic : ajouter ou retirer une parcelle de la sélection.';
+  fiche.appendChild(aide);
+}
+async function copier(txt, msg) {
+  try { await navigator.clipboard.writeText(txt); toast(msg); }
+  catch { prompt('Copier :', txt); }
+}
+
+/* ---------- recherche ---------- */
+function cadrerSur(features) {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const parcourir = c => { if (typeof c[0] === 'number') { minX = Math.min(minX, c[0]); maxX = Math.max(maxX, c[0]); minY = Math.min(minY, c[1]); maxY = Math.max(maxY, c[1]); } else c.forEach(parcourir); };
+  features.forEach(f => f.geometry && parcourir(f.geometry.coordinates));
+  if (!Number.isFinite(minX)) return;
+  carte.fitBounds([[minX, minY], [maxX, maxY]], { padding: { top: 90, bottom: 90, left: 60, right: window.innerWidth > 640 ? 380 : 60 }, maxZoom: 19, duration: 600 });
+}
+function afficherResultats(items) {
+  const ul = $('#resultats');
+  ul.replaceChildren();
+  if (!items.length) {
+    const li = document.createElement('li'); li.className = 'vide'; li.textContent = 'Aucun résultat dans le canton de Genève.'; ul.appendChild(li);
+  }
+  items.forEach((it, i) => {
+    const li = document.createElement('li');
+    if (i === 0) li.classList.add('actif');
+    const t = document.createElement('span'); t.textContent = it.titre;
+    const s = document.createElement('small'); s.textContent = it.sous || '';
+    li.append(t, s);
+    li.addEventListener('click', () => { ul.hidden = true; it.action(); });
+    ul.appendChild(li);
+  });
+  ul.hidden = false;
+}
+function choisirParcelles(features, cadrer = true) {
+  if (!features.length) return;
+  for (const k of selection.keys()) etatF(k, { sel: false });
+  selection.clear();
+  for (const f of features) selection.set(f.properties.cle, f);
+  majSource();
+  afficherFiche();
+  if (cadrer) cadrerSur(features);
+  majLien();
+}
+async function rechercher() {
+  const q = $('#q').value.trim();
+  if (!q) return;
+  try {
+    // EGRID
+    const egrid = q.replace(/\s+/g, '').toUpperCase();
+    if (/^CH\d{12}$/.test(egrid)) {
+      const f = await parcellesParWhere(`EGRID='${egrid}'`);
+      if (!f.length) return afficherResultats([]);
+      return choisirParcelles(f);
+    }
+    // N° de parcelle, éventuellement suivi d'une commune : « 6309 », « parcelle 6309 », « 1234 Carouge »
+    const m = q.match(/^(?:parcelle\s*|n°\s*|no\s*)?(\d{1,6})(?:\s*[,-]?\s*(.+))?$/i);
+    if (m) {
+      const n = Number(m[1]);
+      const commune = (m[2] || '').replace(/'/g, "''").trim();
+      const f = await parcellesParWhere(`NO_PARCELLE=${n}` + (commune ? ` AND UPPER(COMMUNE) LIKE UPPER('%${commune}%')` : ''));
+      if (f.length === 1) return choisirParcelles(f);
+      if (f.length || !commune) return afficherResultats(f.sort((a, b) => String(a.properties.COMMUNE).localeCompare(String(b.properties.COMMUNE), 'fr')).map(x => ({
+        titre: `Parcelle ${x.properties.NO_PARCELLE}`, sous: `${x.properties.COMMUNE} · ${m2(x.properties.SURFACE)}`, action: () => choisirParcelles([x]) })));
+      // sinon : « 100 rue du Rhône » est une adresse, on continue
+    }
+    // Adresse (Mapbox, limité au canton)
+    const p = new URLSearchParams({ q, country: 'ch', language: 'fr', limit: '6', bbox: CONFIG.GENEVE.join(','),
+      types: 'address,street,place,locality,neighborhood', access_token: CONFIG.MAPBOX_TOKEN });
+    const r = await fetch('https://api.mapbox.com/search/geocode/v6/forward?' + p);
+    if (!r.ok) throw new Error('Recherche d\'adresse : HTTP ' + r.status);
+    const j = await r.json();
+    const items = (j.features || []).map(f => ({
+      titre: f.properties.name || f.properties.full_address, sous: f.properties.place_formatted || '',
+      action: () => allerA(f.geometry.coordinates[0], f.geometry.coordinates[1], f.properties.feature_type === 'address')
+    }));
+    if (items.length === 1) return items[0].action();
+    afficherResultats(items);
+  } catch (e) {
+    toast(e.message, 6000);
+  }
+}
+// Adresse trouvée : la carte s'y centre et la parcelle sous le point est sélectionnée
+async function allerA(lon, lat, adresse) {
+  carte.flyTo({ center: [lon, lat], zoom: adresse ? 18.5 : 16.5, duration: 700 });
+  if (!adresse) return;
+  try {
+    const f = await parcellesAuPoint(lon, lat);
+    if (f.length) choisirParcelles([f[0]], false);
+  } catch (e) { console.warn(e); }
+}
+
+/* ---------- lien partageable : ?egrid=CH…,CH… (+ position dans le #) ---------- */
+function majLien() {
+  const u = new URL(location.href);
+  const e = [...selection.values()].map(f => f.properties.EGRID).filter(Boolean);
+  if (e.length) u.searchParams.set('egrid', e.join(',')); else u.searchParams.delete('egrid');
+  history.replaceState(null, '', u);
+}
+async function selectionDepuisLien() {
+  const e = (new URLSearchParams(location.search).get('egrid') || '').split(',').map(x => x.trim().toUpperCase()).filter(x => /^CH\d{12}$/.test(x)).slice(0, 50);
+  if (!e.length) return;
+  try {
+    const f = await parcellesParWhere(`EGRID IN (${e.map(x => `'${x}'`).join(',')})`);
+    if (f.length) { for (const x of f) selection.set(x.properties.cle, x); majSource(); afficherFiche(); if (!location.hash) cadrerSur(f); }
+  } catch (err) { toast('Sélection du lien non chargée : ' + err.message, 6000); }
+}
+
+/* ---------- démarrage ---------- */
+function changerFond(nom) {
+  if (nom === fond || !CONFIG.FONDS[nom]) return;
+  fond = nom;
+  document.querySelectorAll('.fonds button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.fond === nom)));
+  carte.setStyle(CONFIG.FONDS[nom]); // les couches de parcelles sont reposées au « style.load »
+}
+function demarrer() {
+  if (typeof mapboxgl === 'undefined') { etat('Mapbox GL JS n\'a pas pu être chargé.', true); return; }
+  mapboxgl.accessToken = CONFIG.MAPBOX_TOKEN;
+  carte = new mapboxgl.Map({
+    container: 'carte', style: CONFIG.FONDS.plan, center: CONFIG.CENTRE, zoom: CONFIG.ZOOM,
+    hash: true, maxPitch: 0, dragRotate: false, pitchWithRotate: false, touchPitch: false, projection: 'mercator',
+    attributionControl: false
+  });
+  carte.touchZoomRotate.disableRotation();
+  carte.addControl(new mapboxgl.AttributionControl({ compact: true, customAttribution: 'Parcelles © SITG – mensuration officielle (Open Data)' }), 'bottom-right');
+  carte.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right');
+  carte.addControl(new mapboxgl.GeolocateControl({ positionOptions: { enableHighAccuracy: true } }), 'bottom-right');
+  carte.addControl(new mapboxgl.ScaleControl({ unit: 'metric' }), 'bottom-left');
+  carte.on('style.load', () => { poserCouches(); chargerVisibles(); });
+  carte.on('load', () => { brancherInteractions(); selectionDepuisLien(); });
+  let attente = null;
+  carte.on('moveend', () => { clearTimeout(attente); attente = setTimeout(chargerVisibles, 120); });
+  carte.on('zoomend', etatParcelles);
+  carte.on('error', e => console.warn('Mapbox :', e && e.error));
+
+  $('#btnChercher').addEventListener('click', rechercher);
+  $('#q').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); const premier = $('#resultats li.actif'); if (!$('#resultats').hidden && premier) premier.click(); else rechercher(); }
+    if (e.key === 'Escape') $('#resultats').hidden = true;
+  });
+  $('#q').addEventListener('input', () => { $('#resultats').hidden = true; });
+  document.querySelectorAll('.fonds button').forEach(b => b.addEventListener('click', () => changerFond(b.dataset.fond)));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.activeElement !== $('#q')) viderSelection(); });
+  document.addEventListener('click', e => { if (!e.target.closest('.recherche')) $('#resultats').hidden = true; });
+}
+demarrer();
+</script>
+</body>
+</html>
