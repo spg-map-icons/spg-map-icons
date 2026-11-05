@@ -73,6 +73,13 @@
   .entete .onglets a { height: 28px; padding: 0 12px; border-radius: 14px; color: #fff; text-decoration: none; font-size: 13px; display: inline-flex; align-items: center; white-space: nowrap; }
   .entete .onglets a:hover { background: rgba(255,255,255,.18); }
   .entete .onglets a.actif, .entete .onglets a.actif:hover { background: #fff; color: var(--bleu); }
+  .entete .onglets button { height: 28px; padding: 0 10px 0 8px; border: 0; border-radius: 14px; background: transparent; color: #fff; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .entete .onglets button:hover { background: rgba(255,255,255,.18); }
+  .entete .onglets button[aria-pressed="true"], .entete .onglets button[aria-pressed="true"]:hover { background: #fff; color: var(--bleu); }
+  .entete .onglets button i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; border: 1.5px solid #fff; }
+  .entete .onglets button[aria-pressed="true"] i { border-color: transparent; }
+  .entete .onglets button[data-couleur="rouge"] i { background: var(--rouge); }
+  .entete .onglets button[data-couleur="bleu"] i { background: var(--bleu); }
   .entete .qui { font-size: 12px; opacity: .85; white-space: nowrap; }
   .entete button.lien { color: #fff; background: transparent; border-color: rgba(255,255,255,.4); }
   #resultats {
@@ -305,6 +312,10 @@
   </div>
   <span class="espace"></span>
   <span class="qui" id="qui"></span>
+  <div class="onglets couleurs-ref" role="group" aria-label="Couleur des cartouches de références" title="Couleur des cartouches « Property sold », « Advisory », « Letting »">
+    <button type="button" data-couleur="rouge" aria-pressed="true"><i></i>Réf. rouge</button>
+    <button type="button" data-couleur="bleu" aria-pressed="false"><i></i>Réf. bleu</button>
+  </div>
   <button class="lien" id="btnCode" type="button">Code d'équipe</button>
 </header>
 
@@ -456,7 +467,7 @@ const CONFIG = {
   // Logos de marques : site protégé (Cloudflare Access), à la racine du dépôt privé spg-cartes.
   ICON_BASE_URL: 'https://spg-map-icons.github.io/spg-map-icons',
   LOGO_BASE_URL: '..',
-  ICON_VERSION: '1',              // = icon_version de RFP-08
+  ICON_VERSION: '2',              // = icon_version de RFP-08 (2 : cartouches v2 du 05.11, rouge + bleu)
   ICON_SCALE: 2,                  // PNG dessinés pour le rendu @2x : affichés à taille/2 à l'écran
   TAILLE: 760,                    // cadre CSS, identique au placeholder diap. 17
   ECHELLE_EXPORT: 2,              // @2x : image finale 1520 × 1520
@@ -479,13 +490,18 @@ const CONFIG = {
 const $ = (s, r = document) => r.querySelector(s);
 const arrondi = (n, d) => Math.round(n * 10 ** d) / 10 ** d;
 const uid = () => 'm' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
-const RE_CARTOUCHE = /^(ref_(?:vendu|advisory|letting)(?:_fr)?)(_g|_b|_bg|_n)?$/;
-// Cartouches de références : version française = suffixe _fr avant l'orientation (ref_vendu_fr_bg).
-const RE_REF = /^ref_(vendu|advisory|letting)(_fr)?(_g|_b|_bg|_n)?$/;
-const iconeEnLangue = (icone, langue) => {
+// Cartouches de références : ref_<type>[_bleu][_fr][_orientation] (ex. ref_vendu_bleu_fr_bg).
+// Couleur (rouge SPG par défaut, ou bleu SPG) et langue sont des réglages de la carte ; l'orientation est par cartouche.
+const RE_CARTOUCHE = /^(ref_(?:vendu|advisory|letting)(?:_bleu)?(?:_fr)?)(_g|_b|_bg|_n)?$/;
+const RE_REF = /^ref_(vendu|advisory|letting)(_bleu)?(_fr)?(_g|_b|_bg|_n)?$/;
+const COULEURS_REF = ['rouge', 'bleu'];
+const iconeRef = (icone, langue, couleur) => {
   const m = String(icone).match(RE_REF);
-  return m ? `ref_${m[1]}${langue === 'fr' ? '_fr' : ''}${m[3] || ''}` : icone;
+  return m ? `ref_${m[1]}${couleur === 'bleu' ? '_bleu' : ''}${langue === 'fr' ? '_fr' : ''}${m[4] || ''}` : icone;
 };
+// Nom de fichier d'un cartouche dans la langue et la couleur de la carte en cours
+const iconeEnStyle = icone => iconeRef(icone, app.etat.langue, app.etat.reglages.couleur_ref);
+const couleurRefDefaut = () => local.get('spg_carte_couleur_ref') === 'bleu' ? 'bleu' : 'rouge';
 const ORIENTATIONS = ['', '_g', '_b', '_bg', '_n'];
 // Nom sous l'icône : mesures en px de la carte 760 (×2 à l'export), communes à l'écran et à l'image.
 const ETIQUETTE = { taille: 12, interligne: 14, graisse: 600, largeurMax: 124, lignesMax: 2, ecart: 1, couleur: '#003B5C', halo: '#FFFFFF', halo_px: 3 };
@@ -546,7 +562,7 @@ function nouvelEtat() {
   return {
     v: 1, rfp_id: '', langue: 'fr', adresse: '', commune: '', canton: '', npa: '',
     bien: null,
-    reglages: { mode: '', rayon_m: 700, quotas: {}, max_pois: 30, noms: politiqueNomsDefaut() },
+    reglages: { mode: '', rayon_m: 700, quotas: {}, max_pois: 30, noms: politiqueNomsDefaut(), couleur_ref: couleurRefDefaut() },
     marqueurs: [],
     parcelles: [],            // parcelles cadastrales mises en évidence : { id, numero, canton, egrid, geometrie }
     parcelle_visible: local.get('spg_carte_parcelle') !== 'non'
@@ -1146,7 +1162,7 @@ function deplacer(id, lon, lat) {
 
 function ajouterMarqueur(icone, ll) {
   if (!app.etat.bien) { toast('Ouvrez d\'abord une adresse.', 'alerte'); return; }
-  icone = iconeEnLangue(icone, app.etat.langue);
+  icone = iconeEnStyle(icone);
   memoriser();
   const logo = estLogo(icone);
   const m = {
@@ -1371,6 +1387,11 @@ function restaurer(s) {
   const o = JSON.parse(s);
   app.etat.bien = o.bien;
   app.etat.marqueurs = o.marqueurs;
+  const refs = o.marqueurs.filter(m => RE_REF.test(m.icone));
+  if (refs.length) {
+    const c = refs.some(m => /_bleu/.test(m.icone)) ? 'bleu' : 'rouge';
+    if (c !== app.etat.reglages.couleur_ref) { app.etat.reglages.couleur_ref = c; majCouleurRefUI(); if (app.presets) construirePalette(); }
+  }
   if (Array.isArray(o.parcelles)) { app.etat.parcelles = o.parcelles; app.etat.parcelle_visible = o.parcelle_visible !== false; majParcelles(); }
   redessiner();
   marquerModifie();
@@ -1386,15 +1407,29 @@ function retablir() {
   restaurer(app.futur.pop());
 }
 
-// Changement de langue : cartouches de la carte et de la palette passent dans la langue du pitch.
+// Changement de langue ou de couleur : cartouches de la carte et de la palette passent dans la langue et la couleur du pitch.
 function appliquerLangue() {
+  if (!COULEURS_REF.includes(app.etat.reglages.couleur_ref)) app.etat.reglages.couleur_ref = couleurRefDefaut();
   let change = false;
   for (const m of app.etat.marqueurs) {
-    const n = iconeEnLangue(m.icone, app.etat.langue);
+    const n = iconeEnStyle(m.icone);
     if (n !== m.icone) { m.icone = n; change = true; }
   }
   if (change) { redessiner(); marquerModifie(); }
+  majCouleurRefUI();
   if (app.presets) construirePalette();
+}
+function majCouleurRefUI() {
+  document.querySelectorAll('.couleurs-ref button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.couleur === app.etat.reglages.couleur_ref)));
+}
+function changerCouleurRef(couleur) {
+  if (!COULEURS_REF.includes(couleur) || couleur === app.etat.reglages.couleur_ref) return;
+  memoriser();
+  app.etat.reglages.couleur_ref = couleur;
+  local.set('spg_carte_couleur_ref', couleur); // couleur proposée par défaut pour les prochaines cartes
+  appliquerLangue();
+  marquerModifie();
+  majSelection();
 }
 
 function marquerModifie() {
@@ -1607,7 +1642,7 @@ function construirePalette() {
     titre.textContent = g;
     const grille = document.createElement('div');
     grille.className = 'grille-pal' + (liste.every(p => RE_REF.test(p.icone)) ? ' refs' : '');
-    for (const p of liste) grille.appendChild(elementPalette(iconeEnLangue(p.icone, app.etat.langue), p.libelle));
+    for (const p of liste) grille.appendChild(elementPalette(iconeEnStyle(p.icone), p.libelle));
     zone.append(titre, grille);
   }
   const logos = $('#paletteLogos');
@@ -1706,7 +1741,8 @@ function appliquerMode(texte) {
     rayon_m: m.rayon_m,
     max_pois: m.max_pois,
     quotas: { ...m.quotas },
-    noms: app.etat.reglages.noms || politiqueNomsDefaut()
+    noms: app.etat.reglages.noms || politiqueNomsDefaut(),
+    couleur_ref: COULEURS_REF.includes(app.etat.reglages.couleur_ref) ? app.etat.reglages.couleur_ref : couleurRefDefaut()
   };
   afficherReglages();
 }
@@ -1951,7 +1987,7 @@ async function preremplir() {
     }, 45000);
     if (rep.job && !Array.isArray(rep.marqueurs)) rep = await attendreResultat(rep.job);
     const brut = Array.isArray(rep.marqueurs) ? rep.marqueurs : [];
-    const liste = brut.filter(marqueurValide).map(x => normaliserMarqueur({ ...x, icone: iconeEnLangue(x.icone, app.etat.langue) }, 'auto'));
+    const liste = brut.filter(marqueurValide).map(x => normaliserMarqueur({ ...x, icone: iconeEnStyle(x.icone) }, 'auto'));
     memoriser();
     app.etat.marqueurs = app.etat.marqueurs.filter(m => m.source !== 'auto').concat(liste);
     redessiner();
@@ -2149,6 +2185,9 @@ function restaurerEtat(e) {
     parcelles: Array.isArray(e.parcelles) ? e.parcelles.map(normaliserParcelle).filter(Boolean) : [],
     parcelle_visible: e.parcelle_visible !== false
   };
+  if (!e.reglages || !COULEURS_REF.includes(e.reglages.couleur_ref)) {
+    app.etat.reglages.couleur_ref = app.etat.marqueurs.some(m => RE_REF.test(m.icone) && /_bleu/.test(m.icone)) ? 'bleu' : 'rouge';
+  }
   $('#rfp').value = app.etat.rfp_id;
   $('#langue').value = app.etat.langue;
   $('#adresse').value = app.etat.adresse;
@@ -2363,6 +2402,8 @@ function brancher() {
   $('#apercuEnregistrer').addEventListener('click', enregistrer);
   $('#formCode').addEventListener('submit', validerCode);
   $('#btnCode').addEventListener('click', () => { demanderCode(); });
+  document.querySelectorAll('.couleurs-ref button').forEach(b => b.addEventListener('click', () => changerCouleurRef(b.dataset.couleur)));
+  majCouleurRefUI();
   // Onglet « Parcelles » : la carte des parcelles s'ouvre sur le bien, avec sa parcelle sélectionnée, et garde le RFP
   $('#versParcelles').addEventListener('click', e => {
     const u = new URL('../parcelles/', location.href);
