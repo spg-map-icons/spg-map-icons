@@ -69,6 +69,10 @@
   .entete button.fantome { background: rgba(255,255,255,.14); color: #fff; border-color: transparent; }
   .entete button.fantome:hover:not(:disabled) { background: rgba(255,255,255,.24); }
   .entete .espace { flex: 1; }
+  .entete .onglets { display: inline-flex; gap: 2px; background: rgba(255,255,255,.14); border-radius: 17px; padding: 3px; flex-shrink: 0; }
+  .entete .onglets a { height: 28px; padding: 0 12px; border-radius: 14px; color: #fff; text-decoration: none; font-size: 13px; display: inline-flex; align-items: center; white-space: nowrap; }
+  .entete .onglets a:hover { background: rgba(255,255,255,.18); }
+  .entete .onglets a.actif, .entete .onglets a.actif:hover { background: #fff; color: var(--bleu); }
   .entete .qui { font-size: 12px; opacity: .85; white-space: nowrap; }
   .entete button.lien { color: #fff; background: transparent; border-color: rgba(255,255,255,.4); }
   #resultats {
@@ -285,6 +289,10 @@
 
 <header class="entete">
   <div class="marque"><strong>Carte du bien</strong><span>spg partner · pitch diap. 17</span></div>
+  <nav class="onglets" aria-label="Outils cartes SPG">
+    <a class="actif" href="./" aria-current="page">Éditeur</a>
+    <a id="versParcelles" href="../parcelles/" title="Carte des parcelles (cadastre de toute la Suisse)">Parcelles</a>
+  </nav>
   <div class="groupe">
     <input id="rfp" type="text" placeholder="RFP-2026-…" autocomplete="off" aria-label="RFP">
     <select id="langue" aria-label="Langue du pitch"><option value="fr">FR</option><option value="en">EN</option></select>
@@ -444,7 +452,10 @@ const CONFIG = {
   STYLE_OWNER: 'spg-intercity',
   STYLE_ID: 'cm1jd50jn00ea01qvdty30ljs',
   WEBHOOK_URL: 'https://leonka.app.n8n.cloud/webhook/carte-editeur',
-  ICON_BASE_URL: '..',            // les PNG sont à la racine du dépôt spg-map-icons
+  // Pictos et cartouches : dépôt PUBLIC spg-map-icons (GitHub Pages), lu aussi par Mapbox Static pour RFP-08.
+  // Logos de marques : site protégé (Cloudflare Access), à la racine du dépôt privé spg-cartes.
+  ICON_BASE_URL: 'https://spg-map-icons.github.io/spg-map-icons',
+  LOGO_BASE_URL: '..',
   ICON_VERSION: '1',              // = icon_version de RFP-08
   ICON_SCALE: 2,                  // PNG dessinés pour le rendu @2x : affichés à taille/2 à l'écran
   TAILLE: 760,                    // cadre CSS, identique au placeholder diap. 17
@@ -458,7 +469,7 @@ const CONFIG = {
   PARCELLE_API: 'https://api3.geo.admin.ch/rest/services/api/MapServer/identify',
   PARCELLE_COUCHE: 'ch.kantone.cadastralwebmap-farbe',
   PARCELLE_STYLE: { remplissage: '#E4002B', opacite: 0.16, contour: '#E4002B', epaisseur: 2.5 },
-  PRESETS_URL: 'presets.json',
+  PRESETS_URL: 'https://spg-map-icons.github.io/spg-map-icons/editeur/presets.json', // source unique, partagée avec RFP-08
   CENTRE_DEFAUT: [6.1432, 46.2044],
   DELAI_PREREMPLIR_MS: 180000,   // attente maximale du résultat (le pré-remplissage tourne en tâche de fond)
   POIDS_MAX_IMAGE: 4 * 1024 * 1024 // base64 ; au-delà on refuse l'envoi
@@ -550,7 +561,8 @@ const LOGO_REMPLACE = { w: 104, h: 28 };            // logo qui remplace l'icôn
 const estLogo = icone => RE_FICHIER.test(icone);
 function iconeUrl(icone) {
   const fichier = estLogo(icone) ? icone : icone + '.png';
-  return `${CONFIG.ICON_BASE_URL}/${encodeURIComponent(fichier)}?v=${encodeURIComponent(CONFIG.ICON_VERSION)}`;
+  const base = estLogo(icone) ? CONFIG.LOGO_BASE_URL : CONFIG.ICON_BASE_URL;
+  return `${base}/${encodeURIComponent(fichier)}?v=${encodeURIComponent(CONFIG.ICON_VERSION)}`;
 }
 
 // SVG des marques : dimensions absentes, en mm ou en pt selon les fichiers. On fixe une taille en px
@@ -744,7 +756,7 @@ function initCarte() {
     app.refusMapbox = app.refusMapbox.filter(x => t - x < 30000).concat(t);
     const style = !e.tile && !e.sourceId;
     if (style || app.refusMapbox.length >= 5) {
-      bandeau(`Mapbox refuse ${style ? 'le style' : 'les tuiles'} (HTTP ${s}) : vérifiez le token pk. et sa restriction d'URL (https://spg-map-icons.github.io).`);
+      bandeau(`Mapbox refuse ${style ? 'le style' : 'les tuiles'} (HTTP ${s}) : vérifiez le token pk. et sa restriction d'URL (${location.origin}).`);
     }
   });
   map.on('move', majInfoVue);
@@ -2351,6 +2363,17 @@ function brancher() {
   $('#apercuEnregistrer').addEventListener('click', enregistrer);
   $('#formCode').addEventListener('submit', validerCode);
   $('#btnCode').addEventListener('click', () => { demanderCode(); });
+  // Onglet « Parcelles » : la carte des parcelles s'ouvre sur le bien, avec sa parcelle sélectionnée, et garde le RFP
+  $('#versParcelles').addEventListener('click', e => {
+    const u = new URL('../parcelles/', location.href);
+    const rfp = (($('#rfp').value || app.etat.rfp_id || '').trim()).toUpperCase();
+    if (rfp) u.searchParams.set('rfp', rfp);
+    u.searchParams.set('langue', app.etat.langue || 'fr');
+    const egrids = (app.etat.parcelles || []).map(x => x.egrid).filter(x => /^CH\d{12}$/.test(x || ''));
+    if (egrids.length) u.searchParams.set('egrid', egrids.join(','));
+    if (app.map) { const c = app.map.getCenter(); u.hash = `${Math.max(app.map.getZoom(), 16).toFixed(2)}/${c.lat.toFixed(5)}/${c.lng.toFixed(5)}`; }
+    e.currentTarget.href = u.toString();
+  });
   window.addEventListener('beforeunload', e => {
     if (app.modifie && app.etat.bien) { e.preventDefault(); e.returnValue = ''; }
   });
