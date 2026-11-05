@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer-when-downgrade">
-<title>Parcelles GE · VS · SPG</title>
+<title>Parcelles Suisse · SPG</title>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.31.0/mapbox-gl.css" rel="stylesheet">
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.31.0/mapbox-gl.js"></script>
 <style>
@@ -34,6 +34,11 @@
   #resultats li small { color: var(--doux); }
   #resultats .vide { color: var(--doux); cursor: default; }
   .ico { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .onglets { display: inline-flex; background: var(--carte); border-radius: 18px; box-shadow: var(--ombre); padding: 3px; margin-bottom: 8px; }
+  .onglets a { height: 30px; padding: 0 14px; border-radius: 15px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--texte); text-decoration: none; }
+  .onglets a:hover { background: var(--survol); }
+  .onglets a.actif { background: var(--bleu); color: #fff; }
+  .onglets .ico { width: 16px; height: 16px; }
 
   /* Fiche de la sélection (à droite) */
   #fiche { position: absolute; z-index: 5; top: 12px; right: 12px; width: min(340px, calc(100vw - 24px)); max-height: calc(100vh - 120px); overflow-y: auto;
@@ -81,6 +86,10 @@
 <div id="carte"></div>
 
 <div class="recherche">
+  <nav class="onglets" aria-label="Outils cartes SPG">
+    <a id="versEditeur" href="../editeur/" title="Éditeur de carte du pitch (diapositive 17)"><svg class="ico" viewBox="0 0 24 24"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z"/><path d="M9 3v15M15 6v15"/></svg>Éditeur de carte</a>
+    <a class="actif" href="./" aria-current="page"><svg class="ico" viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/><path d="M4 12h16M12 4v16"/></svg>Parcelles</a>
+  </nav>
   <div class="boite">
     <span class="marque">spg <span>·</span> parcelles</span>
     <span class="sep"></span>
@@ -100,9 +109,11 @@
     <button type="button" data-fond="plan" aria-pressed="true">Plan</button>
     <button type="button" data-fond="satellite" aria-pressed="false">Satellite</button>
   </div>
-  <div class="fonds" role="group" aria-label="Aller au canton">
-    <button type="button" data-canton="GE" aria-pressed="false" title="Centrer sur Genève">Genève</button>
-    <button type="button" data-canton="VS" aria-pressed="false" title="Centrer sur Sion">Valais</button>
+  <div class="fonds" role="group" aria-label="Aller à">
+    <button type="button" data-aller="6.1466,46.2033" title="Centrer sur Genève">Genève</button>
+    <button type="button" data-aller="6.6323,46.5197" title="Centrer sur Lausanne">Lausanne</button>
+    <button type="button" data-aller="7.359,46.2331" title="Centrer sur Sion">Sion</button>
+    <button type="button" data-aller="8.5417,47.3769" title="Centrer sur Zurich">Zurich</button>
   </div>
   <span class="pastille" id="etat">Chargement…</span>
 </div>
@@ -111,22 +122,31 @@
 <script>
 'use strict';
 /* =====================================================================
-   Parcelles des cantons de Genève et du Valais sur fond de rues (Mapbox).
-   - GE : SITG, couche CAD_PARCELLE_MENSU (mensuration officielle), Open Data, source à citer.
-   - VS : SIT Valais, service MO, couche 80 « Bien-fonds » (mensuration officielle),
-          Open Data opendata.swiss (utilisation libre, y compris commerciale).
-   Chaque source est un service ArcGIS REST (GeoJSON, CORS ouvert) ; ses champs sont ramenés
-   aux mêmes noms (NO_PARCELLE, COMMUNE, SURFACE, EGRID, LIEN_WWW…) pour le reste de la page.
+   Parcelles de toute la Suisse sur fond de rues (Mapbox). Quatre sources, toutes publiques, sans compte :
+   - GE : SITG, couche CAD_PARCELLE_MENSU (ArcGIS REST). Open Data, source à citer.
+   - VS : SIT Valais, service MO, couche 80 « Bien-fonds » (ArcGIS REST). Open Data opendata.swiss.
+   - 19 autres cantons + FL : geodienste.ch, WFS de la mensuration officielle (offre « librement disponible »).
+   - VD, NE, JU, LU, NW, OW (autorisation requise sur geodienste.ch) : cadastre fédéral de swisstopo
+     via api3.geo.admin.ch (identify / find). Pas de surface ni de commune dans ce service : surface calculée
+     à partir du contour, commune résolue au clic.
+   Les champs de chaque source sont ramenés aux mêmes noms (NO_PARCELLE, COMMUNE, NO_COMM, SURFACE, EGRID,
+   CANTON, LIEN_WWW…) pour le reste de la page. Chaque parcelle ne vient que d'une seule source.
    ===================================================================== */
 const nombre = v => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v))) ? null : Number(v);
+const SUISSE = [5.9, 45.8, 10.6, 47.9];
+// Cœurs de GE et VS (zones où aucun autre canton suisse n'est présent) : on n'y interroge pas les sources nationales
+const COEUR_GE = [5.96, 46.13, 6.25, 46.29], COEUR_VS = [6.95, 46.05, 7.9, 46.35];
+const GEOADMIN = 'https://api3.geo.admin.ch/rest/services/api/MapServer';
+const COUCHE_CADASTRE = 'ch.kantone.cadastralwebmap-farbe';
+const COUCHE_COMMUNES = 'ch.swisstopo.swissboundaries3d-gemeinde-flaeche.fill';
 const SOURCES = [
-  { id: 'GE', nom: 'Genève', service: 'SITG', bbox: [5.95, 46.12, 6.32, 46.37], aller: [6.1466, 46.2033],
+  { id: 'GE', type: 'arcgis', service: 'SITG', bbox: [5.95, 46.12, 6.32, 46.37],
     url: 'https://ge.ch/terags/rest/services/ECADASTRE_rdppf_map/MapServer/47/query',
     champs: 'OBJECTID,NO_PARCELLE,EGRID,COMMUNE,NO_COMM,SURFACE,TYPE_PROPRI,PROPRI_PUBLIQUE,LIEN_WWW',
     whereEgrid: liste => `EGRID IN (${liste})`,
     whereNumero: (n, commune) => `NO_PARCELLE=${Number(n)}` + (commune ? ` AND UPPER(COMMUNE) LIKE UPPER('%${commune}%')` : ''),
     normaliser: p => ({ ...p, SURFACE: nombre(p.SURFACE), LIEN_TEXTE: 'Extrait du registre foncier' }) },
-  { id: 'VS', nom: 'Valais', service: 'SIT Valais', bbox: [6.75, 45.85, 8.5, 46.66], aller: [7.359, 46.2331],
+  { id: 'VS', type: 'arcgis', service: 'SIT Valais', bbox: [6.75, 45.85, 8.5, 46.66],
     url: 'https://sit.vs.ch/arcgis/rest/services/MO/MapServer/80/query',
     champs: 'OBJECTID,NUMERO,COMMUNE,OFS,SUPERFICIE,EGRIS_EGRID',
     whereEgrid: liste => `EGRIS_EGRID IN (${liste})`,
@@ -135,9 +155,40 @@ const SOURCES = [
       EGRID: p.EGRIS_EGRID || null,
       // Extrait RDPPF officiel du canton (PDF généré à la demande)
       LIEN_WWW: p.EGRIS_EGRID ? 'https://rdppf.apps.vs.ch/extract/pdf/?EGRID=' + encodeURIComponent(p.EGRIS_EGRID) : null,
-      LIEN_TEXTE: 'Extrait RDPPF (PDF)' }) }
+      LIEN_TEXTE: 'Extrait RDPPF (PDF)' }) },
+  { id: 'CH', type: 'wfs', service: 'geodienste.ch', bbox: SUISSE,
+    // ces cantons ont leur propre source ci-dessus : on ne les relit pas ici
+    exclure: ['GE', 'VS'], exclureBoites: [COEUR_GE, COEUR_VS],
+    url: 'https://geodienste.ch/db/av_0/fra', typename: 'ms:RESF',
+    normaliser: p => ({ NO_PARCELLE: p.Numero, COMMUNE: null, NO_COMM: p.NoOFS, SURFACE: nombre(p.Surface), EGRID: p.EGRIS_EGRID || null,
+      CANTON: p.Canton, INTEGRALITE: p.Integralite }) },
+  { id: 'GA', type: 'geoadmin', service: 'geo.admin (swisstopo)', cantons: ['VD', 'NE', 'JU', 'LU', 'NW', 'OW'],
+    boites: [[6.06, 46.18, 7.25, 46.99], [6.43, 46.84, 7.1, 47.18], [6.83, 47.15, 7.57, 47.51], [7.83, 46.77, 8.52, 47.29], [8.03, 46.75, 8.58, 47.03]],
+    exclureBoites: [COEUR_GE, COEUR_VS],
+    normaliser: (p, geom, id) => ({ NO_PARCELLE: p.number, COMMUNE: null, NO_COMM: null, SURFACE: aireM2(geom), SURFACE_CALC: true,
+      EGRID: p.egris_egrid || null, CANTON: p.ak, ID_GA: id, LIEN_WWW: p.geoportal_url || null, LIEN_TEXTE: 'Géoportail cantonal' }) }
 ];
-const ATTRIBUTION = ['Parcelles GE © SITG', 'Parcelles VS © État du Valais', 'mensuration officielle (Open Data)'];
+const ATTRIBUTION = ['Parcelles © cantons (geodienste.ch), SITG, État du Valais, swisstopo', 'mensuration officielle (Open Data)'];
+// Aire planimétrique approximative d'un polygone lon/lat (m²), suffisante pour une fiche (± 0,1 %)
+function aireM2(geom) {
+  if (!geom) return null;
+  const polys = geom.type === 'MultiPolygon' ? geom.coordinates : geom.type === 'Polygon' ? [geom.coordinates] : [];
+  let total = 0;
+  for (const anneaux of polys) anneaux.forEach((a, i) => {
+    const lat0 = a[0][1] * Math.PI / 180, kx = 111320 * Math.cos(lat0), ky = 110540;
+    let s = 0;
+    for (let j = 0, k = a.length - 1; j < a.length; k = j++) s += (a[k][0] * kx) * (a[j][1] * ky) - (a[j][0] * kx) * (a[k][1] * ky);
+    total += (i ? -1 : 1) * Math.abs(s) / 2;
+  });
+  return Math.round(Math.max(total, 0));
+}
+// Point dans polygone (anneaux lon/lat)
+const dansAnneau = (pt, a) => { let c = false; for (let i = 0, j = a.length - 1; i < a.length; j = i++) {
+  const [xi, yi] = a[i], [xj, yj] = a[j];
+  if (((yi > pt[1]) !== (yj > pt[1])) && (pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi)) c = !c; } return c; };
+const dansGeom = (pt, g) => { const polys = g.type === 'MultiPolygon' ? g.coordinates : g.type === 'Polygon' ? [g.coordinates] : [];
+  return polys.some(r => dansAnneau(pt, r[0]) && !r.slice(1).some(t => dansAnneau(pt, t))); };
+const premierPoint = g => { let c = g.coordinates; while (Array.isArray(c[0])) c = c[0]; return c; };
 const CONFIG = {
   MAPBOX_TOKEN: 'pk.eyJ1Ijoic3BnLWludGVyY2l0eSIsImEiOiJjbXZrcmlrY3kwcHY0MnlzNjhuYXJvbHZqIn0.eL7u4RtzxWgr0_hcZH8BWg',
   FONDS: { plan: 'mapbox://styles/mapbox/standard', satellite: 'mapbox://styles/mapbox/standard-satellite' },
@@ -146,8 +197,6 @@ const CONFIG = {
   ZOOM_NUMEROS: 17.5,    // numéros écrits sur la carte à partir de ce zoom
   CENTRE: [6.1466, 46.2033],
   ZOOM: 16.5,
-  // Géocodage : rectangle englobant les cantons couverts, puis filtre sur le code de canton renvoyé par Mapbox
-  BBOX_RECHERCHE: [5.95, 45.85, 8.5, 46.66],
   RESULTATS_MAX: 30,
   COULEURS: { trait: '#8C2F39', survol: '#003B5C', selection: '#E4002B', numero: '#6B1F2A', halo: '#FFFFFF' },
   COULEURS_SATELLITE: { trait: '#FFD166', survol: '#FFFFFF', selection: '#FF3B5C', numero: '#FFFFFF', halo: '#1D1F29' }
@@ -167,24 +216,36 @@ function toast(msg, ms = 3500) {
 function etatF(id, st) {
   try { if (carte && carte.getSource('parcelles')) carte.setFeatureState({ source: 'parcelles', id }, st); } catch { /* style en cours de rechargement */ }
 }
-const cleDe = (p, src) => p.EGRID || `${src}-${p.NO_COMM}-${p.NO_PARCELLE}-${p.OBJECTID}`;
-const m2 = n => Number.isFinite(Number(n)) ? Number(n).toLocaleString('fr-CH') + ' m²' : '—';
+const cleDe = (p, src) => p.EGRID || `${src}-${p.ID_GA || [p.NO_COMM, p.NO_PARCELLE, p.OBJECTID].join('-')}`;
+// Noms de communes connus par n° OFS (résolus via geo.admin ; GE et VS livrent déjà le nom)
+const nomsOfs = new Map();
+const communeDe = p => p.COMMUNE || (p.NO_COMM !== null && p.NO_COMM !== undefined && nomsOfs.get(String(p.NO_COMM))) || null;
+const m2 = (n, calc) => n !== null && n !== undefined && n !== '' && Number.isFinite(Number(n)) ? (calc ? '≈ ' : '') + Number(n).toLocaleString('fr-CH') + ' m²' : '—';
+const surfaceDe = p => m2(p.SURFACE, p.SURFACE_CALC);
 
-/* ---------- services cantonaux ---------- */
-async function requete(src, params, { signal } = {}) {
+/* ---------- accès aux services ---------- */
+async function lireJson(url, service, opts) {
+  const r = await fetch(url, opts);
+  if (!r.ok) throw new Error(`${service} : HTTP ${r.status}`);
+  const j = await r.json();
+  if (j.error) throw new Error(`${service} : ${j.error.message || 'erreur'}`);
+  return j;
+}
+function finaliser(src, f) {
+  f.properties.CANTON = f.properties.CANTON || src.id;
+  f.properties.SOURCE = src.id;
+  f.properties.cle = cleDe(f.properties, src.id);
+  return f;
+}
+// ArcGIS REST (GE, VS) : GeoJSON paginé
+async function requeteArcgis(src, params, { signal } = {}) {
   const base = { outFields: src.champs, returnGeometry: 'true', outSR: '4326', f: 'geojson', geometryPrecision: '7', maxAllowableOffset: '0.000002' };
   const features = [];
   for (let offset = 0, tours = 0; tours < 10; tours++) {
     const p = new URLSearchParams({ ...base, ...params, resultOffset: String(offset), resultRecordCount: '2000' });
-    const r = await fetch(src.url + '?' + p, { signal });
-    if (!r.ok) throw new Error(`${src.service} : HTTP ${r.status}`);
-    const j = await r.json();
-    if (j.error) throw new Error(`${src.service} : ${j.error.message || 'erreur'}`);
+    const j = await lireJson(src.url + '?' + p, src.service, { signal });
     const f = (j.features || []).filter(x => x && x.geometry);
-    for (const x of f) {
-      x.properties = { ...src.normaliser(x.properties || {}), CANTON: src.id };
-      x.properties.cle = cleDe(x.properties, src.id);
-    }
+    for (const x of f) { x.properties = src.normaliser(x.properties || {}); finaliser(src, x); }
     features.push(...f);
     const encore = j.exceededTransferLimit || (j.properties && j.properties.exceededTransferLimit);
     if (!encore || !f.length) break;
@@ -192,28 +253,138 @@ async function requete(src, params, { signal } = {}) {
   }
   return features;
 }
+// WFS 2.0 de geodienste.ch : GeoJSON, BBOX en lat/lon, filtre XML, pagination STARTINDEX
+const xmlEch = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const filtreEgal = (champ, v) => `<PropertyIsEqualTo><ValueReference>${champ}</ValueReference><Literal>${xmlEch(v)}</Literal></PropertyIsEqualTo>`;
+const filtreOu = liste => liste.length === 1 ? liste[0] : `<Or>${liste.join('')}</Or>`;
+const filtreEt = liste => liste.length === 1 ? liste[0] : `<And>${liste.join('')}</And>`;
+async function requeteWfs(src, params, { signal } = {}) {
+  const base = { SERVICE: 'WFS', VERSION: '2.0.0', REQUEST: 'GetFeature', TYPENAMES: src.typename, SRSNAME: 'EPSG:4326', COUNT: '5000', OUTPUTFORMAT: 'application/json; subtype=geojson' };
+  const features = [];
+  for (let debut = 0, tours = 0; tours < 10; tours++) {
+    const p = new URLSearchParams({ ...base, ...params, STARTINDEX: String(debut) });
+    const j = await lireJson(src.url + '?' + p, src.service, { signal });
+    const f = (j.features || []).filter(x => x && x.geometry && !(src.exclure || []).includes((x.properties || {}).Canton));
+    for (const x of f) { x.properties = src.normaliser(x.properties || {}); finaliser(src, x); }
+    features.push(...f);
+    const n = (j.features || []).length, total = Number(j.numberMatched);
+    if (!n || !Number.isFinite(total) || debut + n >= total) break;
+    debut += n;
+  }
+  return features;
+}
+// api3.geo.admin.ch : identify (zone ou point) paginé par 200, find (attribut)
+async function requeteGeoadmin(src, chemin, params, { signal } = {}) {
+  const base = chemin === 'identify' ? { layers: 'all:' + COUCHE_CADASTRE, sr: '4326', tolerance: '0', returnGeometry: 'true', geometryFormat: 'geojson', lang: 'fr' }
+    : { layer: COUCHE_CADASTRE, sr: '4326', returnGeometry: 'true', geometryFormat: 'geojson', lang: 'fr' };
+  const features = [];
+  for (let offset = 0, tours = 0; tours < 15; tours++) {
+    const p = new URLSearchParams({ ...base, ...params, limit: '200', offset: String(offset) });
+    const j = await lireJson(`${GEOADMIN}/${chemin}?${p}`, src.service, { signal });
+    const res = (j.results || []).filter(x => x && x.geometry && src.cantons.includes((x.properties || x.attributes || {}).ak));
+    for (const x of res) {
+      const f = { type: 'Feature', geometry: x.geometry, properties: src.normaliser(x.properties || x.attributes || {}, x.geometry, x.featureId || x.id) };
+      features.push(finaliser(src, f));
+    }
+    if ((j.results || []).length < 200 || chemin !== 'identify') break;
+    offset += 200;
+  }
+  return features;
+}
 const intersecte = (a, b) => !(a[2] < b[0] || a[0] > b[2] || a[3] < b[1] || a[1] > b[3]);
 const contient = (b, lon, lat) => lon >= b[0] && lon <= b[2] && lat >= b[1] && lat <= b[3];
-const sourcesPour = bbox => SOURCES.filter(s => intersecte(s.bbox, bbox));
+const dedans = (b, boite) => b[0] >= boite[0] && b[2] <= boite[2] && b[1] >= boite[1] && b[3] <= boite[3];
+function sourcesPour(bbox) {
+  return SOURCES.filter(s => {
+    const touche = s.type === 'geoadmin' ? s.boites.some(b => intersecte(b, bbox)) : intersecte(s.bbox, bbox);
+    return touche && !(s.exclureBoites || []).some(b => dedans(bbox, b)); // zone entièrement dans un canton qui a sa propre source
+  });
+}
+const sourcesAuPoint = (lon, lat) => SOURCES.filter(s => (s.type === 'geoadmin' ? s.boites.some(b => contient(b, lon, lat)) : contient(s.bbox, lon, lat))
+  && !(s.exclureBoites || []).some(b => contient(b, lon, lat)));
 const boiteVue = () => { const b = carte.getBounds(); return [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]; };
-async function parcellesDansBbox(b, opts) {
-  const lots = await Promise.all(sourcesPour(b).map(src => requete(src, { where: '1=1', geometry: b.join(','), geometryType: 'esriGeometryEnvelope', inSR: '4326',
-    spatialRel: 'esriSpatialRelIntersects' }, opts)));
+// Les 4 quarts d'une zone, pour paralléliser geo.admin (200 parcelles par page)
+const quarts = ([w, s, e, n]) => { const mx = (w + e) / 2, my = (s + n) / 2; return [[w, s, mx, my], [mx, s, e, my], [w, my, mx, n], [mx, my, e, n]]; };
+async function chargerZone(src, b, opts) {
+  if (src.type === 'arcgis') return requeteArcgis(src, { where: '1=1', geometry: b.join(','), geometryType: 'esriGeometryEnvelope', inSR: '4326', spatialRel: 'esriSpatialRelIntersects' }, opts);
+  if (src.type === 'wfs') return requeteWfs(src, { BBOX: `${b[1]},${b[0]},${b[3]},${b[2]},EPSG:4326` }, opts);
+  const lots = await Promise.all(quarts(b).map(q => requeteGeoadmin(src, 'identify', { geometryType: 'esriGeometryEnvelope', geometry: q.join(',') }, opts)));
   return lots.flat();
+}
+async function chargerPoint(src, lon, lat) {
+  if (src.type === 'arcgis') return requeteArcgis(src, { where: '1=1', geometry: `${lon},${lat}`, geometryType: 'esriGeometryPoint', inSR: '4326', spatialRel: 'esriSpatialRelIntersects' });
+  if (src.type === 'wfs') { const d = 0.00002; const f = await requeteWfs(src, { BBOX: `${lat - d},${lon - d},${lat + d},${lon + d},EPSG:4326` }); return f.filter(x => dansGeom([lon, lat], x.geometry)); }
+  return requeteGeoadmin(src, 'identify', { geometryType: 'esriGeometryPoint', geometry: `${lon},${lat}` });
+}
+async function chercherEgrid(src, liste) {
+  if (src.type === 'arcgis') return requeteArcgis(src, { where: src.whereEgrid(liste.map(x => `'${x}'`).join(',')) });
+  if (src.type === 'wfs') return requeteWfs(src, { FILTER: `<Filter xmlns="http://www.opengis.net/fes/2.0">${filtreOu(liste.map(x => filtreEgal('EGRIS_EGRID', x)))}</Filter>` });
+  const lots = await Promise.all(liste.map(x => requeteGeoadmin(src, 'find', { searchField: 'egris_egrid', searchText: x, contains: 'false' })));
+  return lots.flat();
+}
+// commune : nom tapé par l'utilisateur ; communes : { ofs: [...], cantons: [...] } résolus via geo.admin (peut être vide)
+async function chercherNumero(src, n, commune, communes) {
+  if (src.type === 'arcgis') return typeof n === 'number' ? requeteArcgis(src, { where: src.whereNumero(n, commune) }) : [];
+  if (src.type === 'wfs') {
+    if (commune && !communes.ofs.length) return [];
+    const cond = [filtreEgal('Numero', String(n))];
+    if (commune) cond.push(filtreOu(communes.ofs.map(o => filtreEgal('NoOFS', o))));
+    return requeteWfs(src, { FILTER: `<Filter xmlns="http://www.opengis.net/fes/2.0">${filtreEt(cond)}</Filter>` });
+  }
+  if (commune && !communes.cantons.some(c => src.cantons.includes(c))) return [];
+  const f = await requeteGeoadmin(src, 'find', { searchField: 'number', searchText: String(n), contains: 'false' });
+  return commune ? f.filter(x => communes.cantons.includes(x.properties.CANTON)) : f;
+}
+// Dédoublonne par clé (une parcelle à cheval sur deux zones revient deux fois)
+const uniques = feats => { const m = new Map(); for (const f of feats) if (!m.has(f.properties.cle)) m.set(f.properties.cle, f); return [...m.values()]; };
+async function parcellesDansBbox(b, opts) {
+  const lots = await Promise.all(sourcesPour(b).map(src => chargerZone(src, b, opts)));
+  const f = uniques(lots.flat());
+  await resoudreCommunes(f);
+  return f;
 }
 async function parcellesAuPoint(lon, lat) {
-  const lots = await Promise.all(SOURCES.filter(s => contient(s.bbox, lon, lat)).map(src => requete(src, { where: '1=1', geometry: `${lon},${lat}`,
-    geometryType: 'esriGeometryPoint', inSR: '4326', spatialRel: 'esriSpatialRelIntersects' })));
-  return lots.flat();
+  const lots = await Promise.all(sourcesAuPoint(lon, lat).map(src => chargerPoint(src, lon, lat)));
+  return uniques(lots.flat());
 }
-// Même requête attributaire sur chaque canton ; un canton en panne n'empêche pas les résultats des autres
-async function parcellesPartout(whereDe) {
-  const res = await Promise.allSettled(SOURCES.map(src => requete(src, { where: whereDe(src) })));
-  const ok = res.filter(r => r.status === 'fulfilled').flatMap(r => r.value);
+// Même recherche sur chaque source ; une source en panne n'empêche pas les résultats des autres
+async function parcellesPartout(fn) {
+  const res = await Promise.allSettled(SOURCES.map(src => fn(src)));
+  const ok = uniques(res.filter(r => r.status === 'fulfilled').flatMap(r => r.value));
   const ko = res.map((r, i) => r.status === 'rejected' ? SOURCES[i].service : null).filter(Boolean);
+  res.forEach((r, i) => { if (r.status === 'rejected') console.warn(SOURCES[i].service, r.reason); });
   if (ko.length && !ok.length) throw new Error(`${ko.join(', ')} injoignable`);
   if (ko.length) toast(`${ko.join(', ')} injoignable : résultats partiels.`, 5000);
   return ok;
+}
+
+/* ---------- communes (geo.admin, limites communales à jour) ---------- */
+const communeCourante = x => { const p = x.properties || x.attributes || {}; return p.is_current_jahr && /gemeinde/.test(p.objektart_lookup || '') ? { nom: p.gemname, ofs: p.gde_nr, canton: p.kanton } : null; };
+async function communeAuPoint(lon, lat) {
+  const p = new URLSearchParams({ geometryType: 'esriGeometryPoint', geometry: `${lon},${lat}`, sr: '4326', layers: 'all:' + COUCHE_COMMUNES, tolerance: '0', returnGeometry: 'false', lang: 'fr' });
+  const j = await lireJson(`${GEOADMIN}/identify?${p}`, 'geo.admin');
+  return (j.results || []).map(communeCourante).find(Boolean) || null;
+}
+// Nom des communes des parcelles geodienste (n° OFS connu) : une requête par commune nouvelle, puis en cache
+async function resoudreCommunes(features) {
+  const aFaire = new Map();
+  for (const f of features) {
+    const p = f.properties;
+    if (p.COMMUNE || p.NO_COMM === null || p.NO_COMM === undefined || nomsOfs.has(String(p.NO_COMM)) || aFaire.has(String(p.NO_COMM))) continue;
+    aFaire.set(String(p.NO_COMM), premierPoint(f.geometry));
+  }
+  await Promise.all([...aFaire].map(async ([ofs, pt]) => {
+    try { const c = await communeAuPoint(pt[0], pt[1]); if (c) nomsOfs.set(ofs, c.nom); } catch (e) { console.warn('commune', ofs, e); }
+  }));
+}
+// Communes dont le nom contient le texte tapé → n° OFS et cantons (pour filtrer geodienste et geo.admin)
+async function communesParNom(nom) {
+  try {
+    const p = new URLSearchParams({ layer: COUCHE_COMMUNES, searchField: 'gemname', searchText: nom, returnGeometry: 'false', sr: '4326' });
+    const j = await lireJson(`${GEOADMIN}/find?${p}`, 'geo.admin');
+    const c = (j.results || []).map(communeCourante).filter(Boolean);
+    return { ofs: [...new Set(c.map(x => x.ofs))], cantons: [...new Set(c.map(x => x.canton))] };
+  } catch (e) { console.warn('communes', e); return { ofs: [], cantons: [] }; }
 }
 
 /* ---------- tuiles de chargement ---------- */
@@ -233,7 +404,7 @@ let enVol = 0;
 async function chargerVisibles() {
   if (!carte) return;
   const z = carte.getZoom();
-  if (!sourcesPour(boiteVue()).length) { etat('Hors des cantons couverts (Genève, Valais) : pas de parcelles ici.', true); majSource(); return; }
+  if (!sourcesPour(boiteVue()).length) { etat('Hors de Suisse : pas de cadastre ici.', true); majSource(); return; }
   if (z < CONFIG.ZOOM_MIN) { etat('Zoomez pour afficher les parcelles.'); majSource(); return; }
   const a_charger = tuilesVisibles().filter(([x, y]) => !cache.has(x + '/' + y));
   if (a_charger.length > 30) { etat('Zoomez pour afficher les parcelles.'); return; }
@@ -289,7 +460,7 @@ function majSource() {
 function etat(msg, alerte = false) { const e = $('#etat'); e.textContent = msg; e.classList.toggle('alerte', alerte); }
 function etatParcelles() {
   if (carte.getZoom() < CONFIG.ZOOM_MIN) return etat('Zoomez pour afficher les parcelles.');
-  if (!sourcesPour(boiteVue()).length) return etat('Hors des cantons couverts (Genève, Valais) : pas de parcelles ici.', true);
+  if (!sourcesPour(boiteVue()).length) return etat('Hors de Suisse : pas de cadastre ici.', true);
   etat(nbAffichees ? `${nbAffichees.toLocaleString('fr-CH')} parcelles · survolez pour le numéro, cliquez pour la fiche` : 'Aucune parcelle dans cette vue');
 }
 
@@ -336,7 +507,7 @@ function brancherInteractions() {
       const p = f.properties;
       bulle.innerHTML = '';
       const s = document.createElement('strong'); s.textContent = `Parcelle ${p.NO_PARCELLE ?? '?'}`;
-      const d = document.createElement('span'); d.textContent = ` · ${p.COMMUNE || ''} · ${m2(p.SURFACE)}`;
+      const d = document.createElement('span'); d.textContent = ` · ${[communeDe(p), p.CANTON].filter(Boolean).join(' · ')} · ${surfaceDe(p)}`;
       bulle.append(s, d);
     }
     bulle.style.left = e.point.x + 'px';
@@ -392,6 +563,7 @@ function afficherFiche() {
   const fiche = $('#fiche');
   document.body.classList.toggle('fiche-ouverte', selection.size > 0);
   if (!selection.size) { fiche.hidden = true; return; }
+  completerCommunes();
   fiche.hidden = false;
   fiche.replaceChildren();
   const fermer = document.createElement('button');
@@ -402,14 +574,15 @@ function afficherFiche() {
   const actions = document.createElement('div'); actions.className = 'actions';
   const bouton = (txt, fn, principal) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = txt; if (principal) b.className = 'principal'; b.addEventListener('click', fn); actions.appendChild(b); return b; };
   const lienFoncier = p => { if (!p.LIEN_WWW) return; const a = document.createElement('a'); a.href = p.LIEN_WWW; a.target = '_blank'; a.rel = 'noopener'; a.textContent = p.LIEN_TEXTE || 'Extrait'; actions.appendChild(a); };
-  const lieu = p => [p.COMMUNE, p.CANTON].filter(Boolean).join(' · ');
+  const lieu = p => [communeDe(p), p.CANTON].filter(Boolean).join(' · ');
   if (liste.length === 1) {
     const p = liste[0];
     const h = document.createElement('h2'); h.textContent = `Parcelle ${p.NO_PARCELLE ?? '?'}`;
     const s = document.createElement('div'); s.className = 'sous'; s.textContent = lieu(p);
     const dl = document.createElement('dl');
     const ligne = (k, v) => { if (v === null || v === undefined || v === '') return; const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); };
-    ligne('Surface', m2(p.SURFACE));
+    ligne('Surface', surfaceDe(p));
+    if (p.INTEGRALITE && p.INTEGRALITE !== 'complet') ligne('Mensuration', p.INTEGRALITE);
     ligne('Propriété', p.TYPE_PROPRI);
     ligne('Propriétaire public', p.PROPRI_PUBLIQUE);
     ligne('EGRID', p.EGRID);
@@ -424,18 +597,37 @@ function afficherFiche() {
     for (const p of liste) {
       const it = document.createElement('div'); it.className = 'item';
       const g = document.createElement('div'); g.textContent = `${p.NO_PARCELLE ?? '?'} · ${lieu(p)}`;
-      const d = document.createElement('small'); d.textContent = m2(p.SURFACE);
+      const d = document.createElement('small'); d.textContent = surfaceDe(p);
       it.append(g, d);
       fiche.appendChild(it);
     }
   }
-  bouton('Copier la liste', () => copier(['Canton\tCommune\tParcelle\tEGRID\tSurface (m²)\tPropriété', ...liste.map(p => [p.CANTON, p.COMMUNE, p.NO_PARCELLE, p.EGRID, p.SURFACE, p.TYPE_PROPRI].map(v => v ?? '').join('\t'))].join('\n'), 'Liste copiée (à coller dans Excel).'), liste.length > 1);
+  bouton('Copier la liste', () => copier(['Canton\tCommune\tParcelle\tEGRID\tSurface (m²)\tPropriété', ...liste.map(p => [p.CANTON, communeDe(p), p.NO_PARCELLE, p.EGRID, p.SURFACE, p.TYPE_PROPRI].map(v => v ?? '').join('\t'))].join('\n'), 'Liste copiée (à coller dans Excel).'), liste.length > 1);
   bouton('Copier le lien', () => copier(location.href, 'Lien copié : il rouvre la carte avec cette sélection.'));
   bouton('Cadrer', () => cadrerSur([...selection.values()]));
   fiche.appendChild(actions);
   const aide = document.createElement('p'); aide.className = 'aide';
   aide.textContent = 'Maj + clic : ajouter ou retirer une parcelle de la sélection.';
   fiche.appendChild(aide);
+}
+// Parcelles sans nom de commune (geo.admin) : commune cherchée au point, parcelle par parcelle (30 au plus)
+async function completerCommunesDe(features, max = 30) {
+  const manque = features.filter(f => !communeDe(f.properties) && !f.properties.COMMUNE_INCONNUE).slice(0, max);
+  await Promise.all(manque.map(async f => {
+    const pt = premierPoint(f.geometry);
+    try { const c = await communeAuPoint(pt[0], pt[1]); if (c) { f.properties.COMMUNE = c.nom; f.properties.NO_COMM = c.ofs; } else f.properties.COMMUNE_INCONNUE = true; }
+    catch (e) { console.warn('commune', e); f.properties.COMMUNE_INCONNUE = true; }
+  }));
+  return manque.length;
+}
+// Sélection : résolution au clic, puis la fiche est redessinée
+let communesEnCours = false;
+async function completerCommunes() {
+  if (communesEnCours) return;
+  communesEnCours = true;
+  let n = 0;
+  try { n = await completerCommunesDe([...selection.values()]); } finally { communesEnCours = false; }
+  if (n && selection.size) afficherFiche();
 }
 async function copier(txt, msg) {
   try { await navigator.clipboard.writeText(txt); toast(msg); }
@@ -454,7 +646,7 @@ function afficherResultats(items) {
   const ul = $('#resultats');
   ul.replaceChildren();
   if (!items.length) {
-    const li = document.createElement('li'); li.className = 'vide'; li.textContent = 'Aucun résultat à Genève ni en Valais.'; ul.appendChild(li);
+    const li = document.createElement('li'); li.className = 'vide'; li.textContent = 'Aucun résultat en Suisse.'; ul.appendChild(li);
   }
   items.slice(0, CONFIG.RESULTATS_MAX).forEach((it, i) => {
     const li = document.createElement('li');
@@ -489,35 +681,32 @@ async function rechercher() {
     // EGRID
     const egrid = q.replace(/\s+/g, '').toUpperCase();
     if (/^CH\d{12}$/.test(egrid)) {
-      const f = await parcellesPartout(src => src.whereEgrid(`'${egrid}'`));
+      const f = await parcellesPartout(src => chercherEgrid(src, [egrid]));
       if (!f.length) return afficherResultats([]);
       return choisirParcelles(f);
     }
-    // N° de parcelle, éventuellement suivi d'une commune : « 6309 », « parcelle 6309 », « 1234 Carouge »
-    const m = q.match(/^(?:parcelle\s*|n°\s*|no\s*)?(\d{1,6})(?:\s*[,-]?\s*(.+))?$/i);
+    // N° de parcelle, éventuellement suivi d'une commune : « 6309 », « parcelle 6309 », « 1234 Carouge », « AA1773 Zürich » (ZH)
+    const m = q.match(/^(?:parcelle\s*|n°\s*|no\s*)?([A-Za-z]{1,3}\d{1,6}|\d{1,6})(?:\s*[,-]?\s*(.+))?$/i);
     if (m) {
-      const n = Number(m[1]);
-      const commune = (m[2] || '').replace(/'/g, "''").replace(/[%_]/g, '').trim();
-      const f = await parcellesPartout(src => src.whereNumero(n, commune));
+      const n = /^\d+$/.test(m[1]) ? Number(m[1]) : m[1].toUpperCase();
+      const commune = (m[2] || '').replace(/'/g, "''").replace(/[%_<>&]/g, '').trim();
+      const communes = commune ? await communesParNom(commune) : { ofs: [], cantons: [] };
+      const f = await parcellesPartout(src => chercherNumero(src, n, commune, communes));
+      await resoudreCommunes(f);
+      if (f.length > 1) await completerCommunesDe(f, CONFIG.RESULTATS_MAX);
       if (f.length === 1) return choisirParcelles(f);
-      const tri = (a, b) => String(a.properties.CANTON).localeCompare(String(b.properties.CANTON)) || String(a.properties.COMMUNE).localeCompare(String(b.properties.COMMUNE), 'fr');
+      const tri = (a, b) => String(a.properties.CANTON).localeCompare(String(b.properties.CANTON)) || String(communeDe(a.properties) || '').localeCompare(String(communeDe(b.properties) || ''), 'fr');
       if (f.length || !commune) return afficherResultats(f.sort(tri).map(x => ({
-        titre: `Parcelle ${x.properties.NO_PARCELLE}`, sous: `${x.properties.COMMUNE} · ${x.properties.CANTON} · ${m2(x.properties.SURFACE)}`, action: () => choisirParcelles([x]) })));
+        titre: `Parcelle ${x.properties.NO_PARCELLE}`, sous: `${[communeDe(x.properties), x.properties.CANTON].filter(Boolean).join(' · ')} · ${surfaceDe(x.properties)}`, action: () => choisirParcelles([x]) })));
       // sinon : « 100 rue du Rhône » est une adresse, on continue
     }
-    // Adresse (Mapbox) : rectangle GE + VS, puis on ne garde que les résultats situés dans un canton couvert
-    const p = new URLSearchParams({ q, country: 'ch', language: 'fr', limit: '10', bbox: CONFIG.BBOX_RECHERCHE.join(','),
+    // Adresse (Mapbox) : toute la Suisse
+    const p = new URLSearchParams({ q, country: 'ch', language: 'fr', limit: '8',
       types: 'address,street,place,locality,neighborhood', access_token: CONFIG.MAPBOX_TOKEN });
     const r = await fetch('https://api.mapbox.com/search/geocode/v6/forward?' + p);
     if (!r.ok) throw new Error('Recherche d\'adresse : HTTP ' + r.status);
     const j = await r.json();
-    const couvert = f => {
-      const code = f.properties && f.properties.context && f.properties.context.region && f.properties.context.region.region_code;
-      if (code) return SOURCES.some(s => s.id === code);
-      const [lon, lat] = f.geometry.coordinates;
-      return SOURCES.some(s => contient(s.bbox, lon, lat));
-    };
-    const items = (j.features || []).filter(couvert).slice(0, 6).map(f => ({
+    const items = (j.features || []).slice(0, 8).map(f => ({
       titre: f.properties.name || f.properties.full_address, sous: f.properties.place_formatted || '',
       action: () => allerA(f.geometry.coordinates[0], f.geometry.coordinates[1], f.properties.feature_type === 'address')
     }));
@@ -548,7 +737,7 @@ async function selectionDepuisLien() {
   const e = (new URLSearchParams(location.search).get('egrid') || '').split(',').map(x => x.trim().toUpperCase()).filter(x => /^CH\d{12}$/.test(x)).slice(0, 50);
   if (!e.length) return;
   try {
-    const f = await parcellesPartout(src => src.whereEgrid(e.map(x => `'${x}'`).join(',')));
+    const f = await parcellesPartout(src => chercherEgrid(src, e));
     if (f.length) { for (const x of f) selection.set(x.properties.cle, x); majSource(); afficherFiche(); if (!location.hash) cadrerSur(f); }
   } catch (err) { toast('Sélection du lien non chargée : ' + err.message, 6000); }
 }
@@ -587,10 +776,16 @@ function demarrer() {
   });
   $('#q').addEventListener('input', () => { $('#resultats').hidden = true; });
   document.querySelectorAll('.fonds button[data-fond]').forEach(b => b.addEventListener('click', () => changerFond(b.dataset.fond)));
-  document.querySelectorAll('.fonds button[data-canton]').forEach(b => b.addEventListener('click', () => {
-    const src = SOURCES.find(s => s.id === b.dataset.canton);
-    if (src) carte.flyTo({ center: src.aller, zoom: 16.5, duration: 900 });
+  document.querySelectorAll('.fonds button[data-aller]').forEach(b => b.addEventListener('click', () => {
+    const [lon, lat] = b.dataset.aller.split(',').map(Number);
+    carte.flyTo({ center: [lon, lat], zoom: 16.5, duration: 900 });
   }));
+  // Onglet « Éditeur de carte » : on garde le RFP et la langue reçus dans l'adresse (#rfp=… de l'éditeur)
+  const q = new URLSearchParams(location.search);
+  const frag = new URLSearchParams();
+  if (/^[A-Za-z0-9_-]{1,40}$/.test(q.get('rfp') || '')) frag.set('rfp', q.get('rfp'));
+  if (['fr', 'en'].includes(q.get('langue'))) frag.set('langue', q.get('langue'));
+  if ([...frag].length) $('#versEditeur').href = '../editeur/#' + frag.toString();
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.activeElement !== $('#q')) viderSelection(); });
   document.addEventListener('click', e => { if (!e.target.closest('.recherche')) $('#resultats').hidden = true; });
 }
