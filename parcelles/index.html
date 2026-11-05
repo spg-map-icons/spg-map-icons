@@ -377,14 +377,28 @@ async function resoudreCommunes(features) {
     try { const c = await communeAuPoint(pt[0], pt[1]); if (c) nomsOfs.set(ofs, c.nom); } catch (e) { console.warn('commune', ofs, e); }
   }));
 }
-// Communes dont le nom contient le texte tapé → n° OFS et cantons (pour filtrer geodienste et geo.admin)
+const sansAccents = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+// Commune tapée par l'utilisateur → n° OFS et cantons (pour filtrer geodienste et geo.admin).
+// 1) geo.admin find en nom exact (le find « contient » est plafonné à 200 lignes, noyées par l'historique) ;
+// 2) sinon Mapbox (place / locality, accents et orthographe tolérés) → commune au point.
 async function communesParNom(nom) {
-  try {
-    const p = new URLSearchParams({ layer: COUCHE_COMMUNES, searchField: 'gemname', searchText: nom, returnGeometry: 'false', sr: '4326' });
-    const j = await lireJson(`${GEOADMIN}/find?${p}`, 'geo.admin');
-    const c = (j.results || []).map(communeCourante).filter(Boolean);
-    return { ofs: [...new Set(c.map(x => x.ofs))], cantons: [...new Set(c.map(x => x.canton))] };
-  } catch (e) { console.warn('communes', e); return { ofs: [], cantons: [] }; }
+  const vus = new Map();
+  const ajouter = c => { if (c) vus.set(c.ofs, c); };
+  for (const v of new Set([nom, nom.charAt(0).toUpperCase() + nom.slice(1)])) {
+    try {
+      const p = new URLSearchParams({ layer: COUCHE_COMMUNES, searchField: 'gemname', searchText: v, contains: 'false', returnGeometry: 'false', sr: '4326' });
+      const j = await lireJson(`${GEOADMIN}/find?${p}`, 'geo.admin');
+      (j.results || []).map(communeCourante).forEach(ajouter);
+    } catch (e) { console.warn('communes', e); }
+  }
+  if (!vus.size) {
+    try {
+      const p = new URLSearchParams({ q: nom, country: 'ch', language: 'fr', limit: '3', types: 'place,locality', access_token: CONFIG.MAPBOX_TOKEN });
+      const j = await lireJson('https://api.mapbox.com/search/geocode/v6/forward?' + p, 'Mapbox');
+      for (const f of (j.features || []).filter(f => sansAccents(f.properties.name) === sansAccents(nom))) ajouter(await communeAuPoint(f.geometry.coordinates[0], f.geometry.coordinates[1]));
+    } catch (e) { console.warn('communes (Mapbox)', e); }
+  }
+  return { ofs: [...vus.keys()], cantons: [...new Set([...vus.values()].map(c => c.canton))], noms: [...vus.values()].map(c => c.nom) };
 }
 
 /* ---------- tuiles de chargement ---------- */
@@ -691,9 +705,11 @@ async function rechercher() {
       const n = /^\d+$/.test(m[1]) ? Number(m[1]) : m[1].toUpperCase();
       const commune = (m[2] || '').replace(/'/g, "''").replace(/[%_<>&]/g, '').trim();
       const communes = commune ? await communesParNom(commune) : { ofs: [], cantons: [] };
-      const f = await parcellesPartout(src => chercherNumero(src, n, commune, communes));
+      let f = await parcellesPartout(src => chercherNumero(src, n, commune, communes));
       await resoudreCommunes(f);
       if (f.length > 1) await completerCommunesDe(f, CONFIG.RESULTATS_MAX);
+      // geo.admin ne filtre que par canton : on garde les parcelles dont la commune résolue correspond au texte tapé
+      if (commune) { const cible = sansAccents(commune); f = f.filter(x => { const c = communeDe(x.properties); return !c || sansAccents(c).includes(cible); }); }
       if (f.length === 1) return choisirParcelles(f);
       const tri = (a, b) => String(a.properties.CANTON).localeCompare(String(b.properties.CANTON)) || String(communeDe(a.properties) || '').localeCompare(String(communeDe(b.properties) || ''), 'fr');
       if (f.length || !commune) return afficherResultats(f.sort(tri).map(x => ({
