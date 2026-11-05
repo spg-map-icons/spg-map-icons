@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="referrer" content="no-referrer-when-downgrade">
-<title>Parcelles Genève · SPG</title>
+<title>Parcelles GE · VS · SPG</title>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.31.0/mapbox-gl.css" rel="stylesheet">
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.31.0/mapbox-gl.js"></script>
 <style>
@@ -100,6 +100,10 @@
     <button type="button" data-fond="plan" aria-pressed="true">Plan</button>
     <button type="button" data-fond="satellite" aria-pressed="false">Satellite</button>
   </div>
+  <div class="fonds" role="group" aria-label="Aller au canton">
+    <button type="button" data-canton="GE" aria-pressed="false" title="Centrer sur Genève">Genève</button>
+    <button type="button" data-canton="VS" aria-pressed="false" title="Centrer sur Sion">Valais</button>
+  </div>
   <span class="pastille" id="etat">Chargement…</span>
 </div>
 <div id="toast" hidden></div>
@@ -107,21 +111,44 @@
 <script>
 'use strict';
 /* =====================================================================
-   Parcelles du canton de Genève sur fond de rues (Mapbox) — données SITG.
-   Source : couche CAD_PARCELLE_MENSU (mensuration officielle), service public du SITG,
-   Open Data (« utilisation libre, obligation d'indiquer la source »).
+   Parcelles des cantons de Genève et du Valais sur fond de rues (Mapbox).
+   - GE : SITG, couche CAD_PARCELLE_MENSU (mensuration officielle), Open Data, source à citer.
+   - VS : SIT Valais, service MO, couche 80 « Bien-fonds » (mensuration officielle),
+          Open Data opendata.swiss (utilisation libre, y compris commerciale).
+   Chaque source est un service ArcGIS REST (GeoJSON, CORS ouvert) ; ses champs sont ramenés
+   aux mêmes noms (NO_PARCELLE, COMMUNE, SURFACE, EGRID, LIEN_WWW…) pour le reste de la page.
    ===================================================================== */
+const nombre = v => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v))) ? null : Number(v);
+const SOURCES = [
+  { id: 'GE', nom: 'Genève', service: 'SITG', bbox: [5.95, 46.12, 6.32, 46.37], aller: [6.1466, 46.2033],
+    url: 'https://ge.ch/terags/rest/services/ECADASTRE_rdppf_map/MapServer/47/query',
+    champs: 'OBJECTID,NO_PARCELLE,EGRID,COMMUNE,NO_COMM,SURFACE,TYPE_PROPRI,PROPRI_PUBLIQUE,LIEN_WWW',
+    whereEgrid: liste => `EGRID IN (${liste})`,
+    whereNumero: (n, commune) => `NO_PARCELLE=${Number(n)}` + (commune ? ` AND UPPER(COMMUNE) LIKE UPPER('%${commune}%')` : ''),
+    normaliser: p => ({ ...p, SURFACE: nombre(p.SURFACE), LIEN_TEXTE: 'Extrait du registre foncier' }) },
+  { id: 'VS', nom: 'Valais', service: 'SIT Valais', bbox: [6.75, 45.85, 8.5, 46.66], aller: [7.359, 46.2331],
+    url: 'https://sit.vs.ch/arcgis/rest/services/MO/MapServer/80/query',
+    champs: 'OBJECTID,NUMERO,COMMUNE,OFS,SUPERFICIE,EGRIS_EGRID',
+    whereEgrid: liste => `EGRIS_EGRID IN (${liste})`,
+    whereNumero: (n, commune) => `NUMERO='${String(Number(n))}'` + (commune ? ` AND UPPER(COMMUNE) LIKE UPPER('%${commune}%')` : ''),
+    normaliser: p => ({ OBJECTID: p.OBJECTID, NO_PARCELLE: p.NUMERO, COMMUNE: p.COMMUNE, NO_COMM: p.OFS, SURFACE: nombre(p.SUPERFICIE),
+      EGRID: p.EGRIS_EGRID || null,
+      // Extrait RDPPF officiel du canton (PDF généré à la demande)
+      LIEN_WWW: p.EGRIS_EGRID ? 'https://rdppf.apps.vs.ch/extract/pdf/?EGRID=' + encodeURIComponent(p.EGRIS_EGRID) : null,
+      LIEN_TEXTE: 'Extrait RDPPF (PDF)' }) }
+];
+const ATTRIBUTION = ['Parcelles GE © SITG', 'Parcelles VS © État du Valais', 'mensuration officielle (Open Data)'];
 const CONFIG = {
   MAPBOX_TOKEN: 'pk.eyJ1Ijoic3BnLWludGVyY2l0eSIsImEiOiJjbXZrcmlrY3kwcHY0MnlzNjhuYXJvbHZqIn0.eL7u4RtzxWgr0_hcZH8BWg',
   FONDS: { plan: 'mapbox://styles/mapbox/standard', satellite: 'mapbox://styles/mapbox/standard-satellite' },
-  SITG: 'https://ge.ch/terags/rest/services/ECADASTRE_rdppf_map/MapServer/47/query',
-  CHAMPS: 'OBJECTID,NO_PARCELLE,EGRID,COMMUNE,NO_COMM,SURFACE,TYPE_PROPRI,PROPRI_PUBLIQUE,LIEN_WWW',
   ZOOM_MIN: 15,          // en dessous : trop de parcelles, on invite à zoomer
   ZOOM_TUILE: 15,        // grille de chargement (≈ 850 m de côté à Genève)
   ZOOM_NUMEROS: 17.5,    // numéros écrits sur la carte à partir de ce zoom
   CENTRE: [6.1466, 46.2033],
   ZOOM: 16.5,
-  GENEVE: [5.95, 46.12, 6.32, 46.37],
+  // Géocodage : rectangle englobant les cantons couverts, puis filtre sur le code de canton renvoyé par Mapbox
+  BBOX_RECHERCHE: [5.95, 45.85, 8.5, 46.66],
+  RESULTATS_MAX: 30,
   COULEURS: { trait: '#8C2F39', survol: '#003B5C', selection: '#E4002B', numero: '#6B1F2A', halo: '#FFFFFF' },
   COULEURS_SATELLITE: { trait: '#FFD166', survol: '#FFFFFF', selection: '#FF3B5C', numero: '#FFFFFF', halo: '#1D1F29' }
 };
@@ -140,21 +167,24 @@ function toast(msg, ms = 3500) {
 function etatF(id, st) {
   try { if (carte && carte.getSource('parcelles')) carte.setFeatureState({ source: 'parcelles', id }, st); } catch { /* style en cours de rechargement */ }
 }
-const cleDe = p => p.EGRID || `${p.NO_COMM}-${p.NO_PARCELLE}` || String(p.OBJECTID);
+const cleDe = (p, src) => p.EGRID || `${src}-${p.NO_COMM}-${p.NO_PARCELLE}-${p.OBJECTID}`;
 const m2 = n => Number.isFinite(Number(n)) ? Number(n).toLocaleString('fr-CH') + ' m²' : '—';
 
-/* ---------- SITG ---------- */
-async function requeteSitg(params, { signal } = {}) {
-  const base = { outFields: CONFIG.CHAMPS, returnGeometry: 'true', outSR: '4326', f: 'geojson', geometryPrecision: '7' };
+/* ---------- services cantonaux ---------- */
+async function requete(src, params, { signal } = {}) {
+  const base = { outFields: src.champs, returnGeometry: 'true', outSR: '4326', f: 'geojson', geometryPrecision: '7', maxAllowableOffset: '0.000002' };
   const features = [];
   for (let offset = 0, tours = 0; tours < 10; tours++) {
     const p = new URLSearchParams({ ...base, ...params, resultOffset: String(offset), resultRecordCount: '2000' });
-    const r = await fetch(CONFIG.SITG + '?' + p, { signal });
-    if (!r.ok) throw new Error('SITG : HTTP ' + r.status);
+    const r = await fetch(src.url + '?' + p, { signal });
+    if (!r.ok) throw new Error(`${src.service} : HTTP ${r.status}`);
     const j = await r.json();
-    if (j.error) throw new Error('SITG : ' + (j.error.message || 'erreur'));
+    if (j.error) throw new Error(`${src.service} : ${j.error.message || 'erreur'}`);
     const f = (j.features || []).filter(x => x && x.geometry);
-    for (const x of f) { x.properties = x.properties || {}; x.properties.cle = cleDe(x.properties); }
+    for (const x of f) {
+      x.properties = { ...src.normaliser(x.properties || {}), CANTON: src.id };
+      x.properties.cle = cleDe(x.properties, src.id);
+    }
     features.push(...f);
     const encore = j.exceededTransferLimit || (j.properties && j.properties.exceededTransferLimit);
     if (!encore || !f.length) break;
@@ -162,11 +192,29 @@ async function requeteSitg(params, { signal } = {}) {
   }
   return features;
 }
-const parcellesDansBbox = (b, opts) => requeteSitg({ where: '1=1', geometry: b.join(','), geometryType: 'esriGeometryEnvelope', inSR: '4326',
-  spatialRel: 'esriSpatialRelIntersects', maxAllowableOffset: '0.000002' }, opts);
-const parcellesAuPoint = (lon, lat) => requeteSitg({ where: '1=1', geometry: `${lon},${lat}`, geometryType: 'esriGeometryPoint', inSR: '4326',
-  spatialRel: 'esriSpatialRelIntersects' });
-const parcellesParWhere = where => requeteSitg({ where });
+const intersecte = (a, b) => !(a[2] < b[0] || a[0] > b[2] || a[3] < b[1] || a[1] > b[3]);
+const contient = (b, lon, lat) => lon >= b[0] && lon <= b[2] && lat >= b[1] && lat <= b[3];
+const sourcesPour = bbox => SOURCES.filter(s => intersecte(s.bbox, bbox));
+const boiteVue = () => { const b = carte.getBounds(); return [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()]; };
+async function parcellesDansBbox(b, opts) {
+  const lots = await Promise.all(sourcesPour(b).map(src => requete(src, { where: '1=1', geometry: b.join(','), geometryType: 'esriGeometryEnvelope', inSR: '4326',
+    spatialRel: 'esriSpatialRelIntersects' }, opts)));
+  return lots.flat();
+}
+async function parcellesAuPoint(lon, lat) {
+  const lots = await Promise.all(SOURCES.filter(s => contient(s.bbox, lon, lat)).map(src => requete(src, { where: '1=1', geometry: `${lon},${lat}`,
+    geometryType: 'esriGeometryPoint', inSR: '4326', spatialRel: 'esriSpatialRelIntersects' })));
+  return lots.flat();
+}
+// Même requête attributaire sur chaque canton ; un canton en panne n'empêche pas les résultats des autres
+async function parcellesPartout(whereDe) {
+  const res = await Promise.allSettled(SOURCES.map(src => requete(src, { where: whereDe(src) })));
+  const ok = res.filter(r => r.status === 'fulfilled').flatMap(r => r.value);
+  const ko = res.map((r, i) => r.status === 'rejected' ? SOURCES[i].service : null).filter(Boolean);
+  if (ko.length && !ok.length) throw new Error(`${ko.join(', ')} injoignable`);
+  if (ko.length) toast(`${ko.join(', ')} injoignable : résultats partiels.`, 5000);
+  return ok;
+}
 
 /* ---------- tuiles de chargement ---------- */
 const lon2x = (lon, z) => Math.floor((lon + 180) / 360 * 2 ** z);
@@ -180,31 +228,30 @@ function tuilesVisibles() {
   for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) t.push([x, y]);
   return t;
 }
-const dansGeneve = b => !(b.getEast() < CONFIG.GENEVE[0] || b.getWest() > CONFIG.GENEVE[2] || b.getNorth() < CONFIG.GENEVE[1] || b.getSouth() > CONFIG.GENEVE[3]);
 
 let enVol = 0;
 async function chargerVisibles() {
   if (!carte) return;
-  const z = carte.getZoom(), b = carte.getBounds();
-  if (!dansGeneve(b)) { etat('Hors du canton de Genève : pas de parcelles SITG ici.', true); majSource(); return; }
+  const z = carte.getZoom();
+  if (!sourcesPour(boiteVue()).length) { etat('Hors des cantons couverts (Genève, Valais) : pas de parcelles ici.', true); majSource(); return; }
   if (z < CONFIG.ZOOM_MIN) { etat('Zoomez pour afficher les parcelles.'); majSource(); return; }
   const a_charger = tuilesVisibles().filter(([x, y]) => !cache.has(x + '/' + y));
   if (a_charger.length > 30) { etat('Zoomez pour afficher les parcelles.'); return; }
   if (!a_charger.length) { majSource(); etatParcelles(); return; }
   etat('Chargement des parcelles…');
-  let echecs = 0;
+  let echecs = 0; const enPanne = new Set();
   await Promise.all(a_charger.map(async ([x, y]) => {
     const cle = x + '/' + y;
     cache.set(cle, { statut: 'charge', features: [] });
     enVol++;
+    const bbox = [x2lon(x, CONFIG.ZOOM_TUILE), y2lat(y + 1, CONFIG.ZOOM_TUILE), x2lon(x + 1, CONFIG.ZOOM_TUILE), y2lat(y, CONFIG.ZOOM_TUILE)];
     try {
-      const bbox = [x2lon(x, CONFIG.ZOOM_TUILE), y2lat(y + 1, CONFIG.ZOOM_TUILE), x2lon(x + 1, CONFIG.ZOOM_TUILE), y2lat(y, CONFIG.ZOOM_TUILE)];
       const f = await parcellesDansBbox(bbox);
       cache.set(cle, { statut: 'ok', features: f, t: Date.now() });
     } catch (e) {
       console.warn('Tuile', cle, e);
       cache.delete(cle); // nouvel essai au prochain déplacement, ou automatiquement dans 8 s
-      echecs++;
+      echecs++; sourcesPour(bbox).forEach(s => enPanne.add(s.service));
     } finally {
       enVol--;
       majSource();
@@ -212,7 +259,7 @@ async function chargerVisibles() {
   }));
   purgerCache();
   if (echecs) {
-    etat('Cadastre SITG momentanément injoignable : nouvel essai dans quelques secondes.', true);
+    etat(`Cadastre ${[...enPanne].join(' / ') || 'cantonal'} momentanément injoignable : nouvel essai dans quelques secondes.`, true);
     clearTimeout(chargerVisibles.reessai); chargerVisibles.reessai = setTimeout(chargerVisibles, 8000);
   } else if (!enVol) etatParcelles();
 }
@@ -242,7 +289,8 @@ function majSource() {
 function etat(msg, alerte = false) { const e = $('#etat'); e.textContent = msg; e.classList.toggle('alerte', alerte); }
 function etatParcelles() {
   if (carte.getZoom() < CONFIG.ZOOM_MIN) return etat('Zoomez pour afficher les parcelles.');
-  etat(nbAffichees ? `${nbAffichees.toLocaleString('fr-CH')} parcelles · survolez pour le numéro, cliquez pour la fiche` : 'Parcelles SITG');
+  if (!sourcesPour(boiteVue()).length) return etat('Hors des cantons couverts (Genève, Valais) : pas de parcelles ici.', true);
+  etat(nbAffichees ? `${nbAffichees.toLocaleString('fr-CH')} parcelles · survolez pour le numéro, cliquez pour la fiche` : 'Aucune parcelle dans cette vue');
 }
 
 /* ---------- couches ---------- */
@@ -353,11 +401,12 @@ function afficherFiche() {
   const liste = [...selection.values()].map(f => f.properties);
   const actions = document.createElement('div'); actions.className = 'actions';
   const bouton = (txt, fn, principal) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = txt; if (principal) b.className = 'principal'; b.addEventListener('click', fn); actions.appendChild(b); return b; };
-  const lienFoncier = (p, txt) => { if (!p.LIEN_WWW) return; const a = document.createElement('a'); a.href = p.LIEN_WWW; a.target = '_blank'; a.rel = 'noopener'; a.textContent = txt; actions.appendChild(a); };
+  const lienFoncier = p => { if (!p.LIEN_WWW) return; const a = document.createElement('a'); a.href = p.LIEN_WWW; a.target = '_blank'; a.rel = 'noopener'; a.textContent = p.LIEN_TEXTE || 'Extrait'; actions.appendChild(a); };
+  const lieu = p => [p.COMMUNE, p.CANTON].filter(Boolean).join(' · ');
   if (liste.length === 1) {
     const p = liste[0];
     const h = document.createElement('h2'); h.textContent = `Parcelle ${p.NO_PARCELLE ?? '?'}`;
-    const s = document.createElement('div'); s.className = 'sous'; s.textContent = p.COMMUNE || '';
+    const s = document.createElement('div'); s.className = 'sous'; s.textContent = lieu(p);
     const dl = document.createElement('dl');
     const ligne = (k, v) => { if (v === null || v === undefined || v === '') return; const dt = document.createElement('dt'); dt.textContent = k; const dd = document.createElement('dd'); dd.textContent = v; dl.append(dt, dd); };
     ligne('Surface', m2(p.SURFACE));
@@ -365,7 +414,7 @@ function afficherFiche() {
     ligne('Propriétaire public', p.PROPRI_PUBLIQUE);
     ligne('EGRID', p.EGRID);
     fiche.append(h, s, dl);
-    lienFoncier(p, 'Extrait du registre foncier');
+    lienFoncier(p);
     if (p.EGRID) bouton('Copier l\'EGRID', () => copier(p.EGRID, 'EGRID copié.'));
   } else {
     const total = liste.reduce((t, p) => t + (Number(p.SURFACE) || 0), 0);
@@ -374,13 +423,13 @@ function afficherFiche() {
     fiche.append(h, s);
     for (const p of liste) {
       const it = document.createElement('div'); it.className = 'item';
-      const g = document.createElement('div'); g.textContent = `${p.NO_PARCELLE ?? '?'} · ${p.COMMUNE || ''}`;
+      const g = document.createElement('div'); g.textContent = `${p.NO_PARCELLE ?? '?'} · ${lieu(p)}`;
       const d = document.createElement('small'); d.textContent = m2(p.SURFACE);
       it.append(g, d);
       fiche.appendChild(it);
     }
   }
-  bouton('Copier la liste', () => copier(['Commune\tParcelle\tEGRID\tSurface (m²)\tPropriété', ...liste.map(p => [p.COMMUNE, p.NO_PARCELLE, p.EGRID, p.SURFACE, p.TYPE_PROPRI].join('\t'))].join('\n'), 'Liste copiée (à coller dans Excel).'), liste.length > 1);
+  bouton('Copier la liste', () => copier(['Canton\tCommune\tParcelle\tEGRID\tSurface (m²)\tPropriété', ...liste.map(p => [p.CANTON, p.COMMUNE, p.NO_PARCELLE, p.EGRID, p.SURFACE, p.TYPE_PROPRI].map(v => v ?? '').join('\t'))].join('\n'), 'Liste copiée (à coller dans Excel).'), liste.length > 1);
   bouton('Copier le lien', () => copier(location.href, 'Lien copié : il rouvre la carte avec cette sélection.'));
   bouton('Cadrer', () => cadrerSur([...selection.values()]));
   fiche.appendChild(actions);
@@ -405,9 +454,9 @@ function afficherResultats(items) {
   const ul = $('#resultats');
   ul.replaceChildren();
   if (!items.length) {
-    const li = document.createElement('li'); li.className = 'vide'; li.textContent = 'Aucun résultat dans le canton de Genève.'; ul.appendChild(li);
+    const li = document.createElement('li'); li.className = 'vide'; li.textContent = 'Aucun résultat à Genève ni en Valais.'; ul.appendChild(li);
   }
-  items.forEach((it, i) => {
+  items.slice(0, CONFIG.RESULTATS_MAX).forEach((it, i) => {
     const li = document.createElement('li');
     if (i === 0) li.classList.add('actif');
     const t = document.createElement('span'); t.textContent = it.titre;
@@ -416,6 +465,11 @@ function afficherResultats(items) {
     li.addEventListener('click', () => { ul.hidden = true; it.action(); });
     ul.appendChild(li);
   });
+  if (items.length > CONFIG.RESULTATS_MAX) {
+    const li = document.createElement('li'); li.className = 'vide';
+    li.textContent = `${items.length - CONFIG.RESULTATS_MAX} autres résultats : précisez la commune (ex. « 395 Sion »).`;
+    ul.appendChild(li);
+  }
   ul.hidden = false;
 }
 function choisirParcelles(features, cadrer = true) {
@@ -435,7 +489,7 @@ async function rechercher() {
     // EGRID
     const egrid = q.replace(/\s+/g, '').toUpperCase();
     if (/^CH\d{12}$/.test(egrid)) {
-      const f = await parcellesParWhere(`EGRID='${egrid}'`);
+      const f = await parcellesPartout(src => src.whereEgrid(`'${egrid}'`));
       if (!f.length) return afficherResultats([]);
       return choisirParcelles(f);
     }
@@ -443,20 +497,27 @@ async function rechercher() {
     const m = q.match(/^(?:parcelle\s*|n°\s*|no\s*)?(\d{1,6})(?:\s*[,-]?\s*(.+))?$/i);
     if (m) {
       const n = Number(m[1]);
-      const commune = (m[2] || '').replace(/'/g, "''").trim();
-      const f = await parcellesParWhere(`NO_PARCELLE=${n}` + (commune ? ` AND UPPER(COMMUNE) LIKE UPPER('%${commune}%')` : ''));
+      const commune = (m[2] || '').replace(/'/g, "''").replace(/[%_]/g, '').trim();
+      const f = await parcellesPartout(src => src.whereNumero(n, commune));
       if (f.length === 1) return choisirParcelles(f);
-      if (f.length || !commune) return afficherResultats(f.sort((a, b) => String(a.properties.COMMUNE).localeCompare(String(b.properties.COMMUNE), 'fr')).map(x => ({
-        titre: `Parcelle ${x.properties.NO_PARCELLE}`, sous: `${x.properties.COMMUNE} · ${m2(x.properties.SURFACE)}`, action: () => choisirParcelles([x]) })));
+      const tri = (a, b) => String(a.properties.CANTON).localeCompare(String(b.properties.CANTON)) || String(a.properties.COMMUNE).localeCompare(String(b.properties.COMMUNE), 'fr');
+      if (f.length || !commune) return afficherResultats(f.sort(tri).map(x => ({
+        titre: `Parcelle ${x.properties.NO_PARCELLE}`, sous: `${x.properties.COMMUNE} · ${x.properties.CANTON} · ${m2(x.properties.SURFACE)}`, action: () => choisirParcelles([x]) })));
       // sinon : « 100 rue du Rhône » est une adresse, on continue
     }
-    // Adresse (Mapbox, limité au canton)
-    const p = new URLSearchParams({ q, country: 'ch', language: 'fr', limit: '6', bbox: CONFIG.GENEVE.join(','),
+    // Adresse (Mapbox) : rectangle GE + VS, puis on ne garde que les résultats situés dans un canton couvert
+    const p = new URLSearchParams({ q, country: 'ch', language: 'fr', limit: '10', bbox: CONFIG.BBOX_RECHERCHE.join(','),
       types: 'address,street,place,locality,neighborhood', access_token: CONFIG.MAPBOX_TOKEN });
     const r = await fetch('https://api.mapbox.com/search/geocode/v6/forward?' + p);
     if (!r.ok) throw new Error('Recherche d\'adresse : HTTP ' + r.status);
     const j = await r.json();
-    const items = (j.features || []).map(f => ({
+    const couvert = f => {
+      const code = f.properties && f.properties.context && f.properties.context.region && f.properties.context.region.region_code;
+      if (code) return SOURCES.some(s => s.id === code);
+      const [lon, lat] = f.geometry.coordinates;
+      return SOURCES.some(s => contient(s.bbox, lon, lat));
+    };
+    const items = (j.features || []).filter(couvert).slice(0, 6).map(f => ({
       titre: f.properties.name || f.properties.full_address, sous: f.properties.place_formatted || '',
       action: () => allerA(f.geometry.coordinates[0], f.geometry.coordinates[1], f.properties.feature_type === 'address')
     }));
@@ -487,7 +548,7 @@ async function selectionDepuisLien() {
   const e = (new URLSearchParams(location.search).get('egrid') || '').split(',').map(x => x.trim().toUpperCase()).filter(x => /^CH\d{12}$/.test(x)).slice(0, 50);
   if (!e.length) return;
   try {
-    const f = await parcellesParWhere(`EGRID IN (${e.map(x => `'${x}'`).join(',')})`);
+    const f = await parcellesPartout(src => src.whereEgrid(e.map(x => `'${x}'`).join(',')));
     if (f.length) { for (const x of f) selection.set(x.properties.cle, x); majSource(); afficherFiche(); if (!location.hash) cadrerSur(f); }
   } catch (err) { toast('Sélection du lien non chargée : ' + err.message, 6000); }
 }
@@ -496,7 +557,7 @@ async function selectionDepuisLien() {
 function changerFond(nom) {
   if (nom === fond || !CONFIG.FONDS[nom]) return;
   fond = nom;
-  document.querySelectorAll('.fonds button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.fond === nom)));
+  document.querySelectorAll('.fonds button[data-fond]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.fond === nom)));
   carte.setStyle(CONFIG.FONDS[nom]); // les couches de parcelles sont reposées au « style.load »
 }
 function demarrer() {
@@ -508,7 +569,7 @@ function demarrer() {
     attributionControl: false
   });
   carte.touchZoomRotate.disableRotation();
-  carte.addControl(new mapboxgl.AttributionControl({ compact: true, customAttribution: 'Parcelles © SITG – mensuration officielle (Open Data)' }), 'bottom-right');
+  carte.addControl(new mapboxgl.AttributionControl({ compact: true, customAttribution: ATTRIBUTION }), 'bottom-right');
   carte.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'bottom-right');
   carte.addControl(new mapboxgl.GeolocateControl({ positionOptions: { enableHighAccuracy: true } }), 'bottom-right');
   carte.addControl(new mapboxgl.ScaleControl({ unit: 'metric' }), 'bottom-left');
@@ -525,7 +586,11 @@ function demarrer() {
     if (e.key === 'Escape') $('#resultats').hidden = true;
   });
   $('#q').addEventListener('input', () => { $('#resultats').hidden = true; });
-  document.querySelectorAll('.fonds button').forEach(b => b.addEventListener('click', () => changerFond(b.dataset.fond)));
+  document.querySelectorAll('.fonds button[data-fond]').forEach(b => b.addEventListener('click', () => changerFond(b.dataset.fond)));
+  document.querySelectorAll('.fonds button[data-canton]').forEach(b => b.addEventListener('click', () => {
+    const src = SOURCES.find(s => s.id === b.dataset.canton);
+    if (src) carte.flyTo({ center: src.aller, zoom: 16.5, duration: 900 });
+  }));
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.activeElement !== $('#q')) viderSelection(); });
   document.addEventListener('click', e => { if (!e.target.closest('.recherche')) $('#resultats').hidden = true; });
 }
