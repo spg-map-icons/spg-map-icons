@@ -475,7 +475,9 @@ const CONFIG = {
   // Texte « © Mapbox © OpenStreetMap » hors de l'image : il figure sur la diapositive (carte_sources),
   // ce que Mapbox admet pour l'imprimé. Le logo Mapbox, lui, reste obligatoire sur l'image.
   EXPORT_ATTRIBUTION: false,
-  GEOCODAGE_PERMANENT: true,      // l'état enregistré conserve les coordonnées du pin
+  // Recherche d'adresse : service de recherche de la Confédération (geo.admin), gratuit et sans restriction de
+  // conservation des résultats. Mapbox ne sert plus qu'au fond de carte et à l'image du pitch (paliers gratuits).
+  GEOCODEUR: 'https://api3.geo.admin.ch/rest/services/api/SearchServer',
   // Parcelle cadastrale du bien : cadastre fédéral (CadastralWebMap, toute la Suisse), via api3.geo.admin.ch
   PARCELLE_API: 'https://api3.geo.admin.ch/rest/services/api/MapServer/identify',
   PARCELLE_COUCHE: 'ch.kantone.cadastralwebmap-farbe',
@@ -1801,29 +1803,35 @@ function lireCoordonnees(txt) {
 async function geocoder(q) {
   const coords = lireCoordonnees(q);
   if (coords) return [coords];
-  const params = new URLSearchParams({
-    q, country: 'ch', language: app.etat.langue === 'en' ? 'en' : 'fr', limit: '5',
-    types: 'address,street,place,locality,neighborhood', access_token: CONFIG.MAPBOX_TOKEN
-  });
-  if (CONFIG.GEOCODAGE_PERMANENT) params.set('permanent', 'true');
-  const url = p => 'https://api.mapbox.com/search/geocode/v6/forward?' + p.toString();
-  let r = await fetch(url(params));
-  if (!r.ok && CONFIG.GEOCODAGE_PERMANENT && r.status !== 401) {
-    params.delete('permanent');
-    r = await fetch(url(params));
-    if (r.ok) bandeau('Géocodage permanent refusé par Mapbox : géocodage temporaire utilisé. Voir les conditions de stockage avant mise en production.');
-  }
-  if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? 'Token Mapbox refusé pour le géocodage.' : `Géocodage en erreur (HTTP ${r.status}).`);
+  // origins : adresses (avec n°), localités / NPA, communes
+  const params = new URLSearchParams({ searchText: q, type: 'locations', origins: 'address,zipcode,gg25', limit: '6', sr: '4326',
+    lang: app.etat.langue === 'en' ? 'en' : 'fr' });
+  let r;
+  try { r = await fetch(CONFIG.GEOCODEUR + '?' + params); }
+  catch (e) { throw new Error('Recherche d\'adresse (geo.admin) injoignable : vérifiez la connexion, ou saisissez des coordonnées « lat, lon ».'); }
+  if (!r.ok) throw new Error(`Recherche d'adresse (geo.admin) en erreur (HTTP ${r.status}).`);
   const j = await r.json();
-  return (j.features || []).map(f => {
-    const p = f.properties || {}, c = p.context || {};
-    return {
-      libelle: p.full_address || p.name || '',
-      lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1],
-      commune: c.place?.name || c.locality?.name || '',
-      canton: c.region?.region_code || '',
-      npa: c.postcode?.name || ''
-    };
+  const sansGras = t => String(t || '').replace(/<\/?b>/g, '').replace(/\s+/g, ' ').trim();
+  return (j.results || []).map(x => {
+    const a = x.attrs || {};
+    const libelle = sansGras(a.label), detail = String(a.detail || '');
+    let commune = '', canton = '', npa = '';
+    if (a.origin === 'address') {
+      // detail : « rue du rhone 100 1204 geneve 6621 geneve ch ge » ; label : « Rue du Rhône 100 1204 Genève »
+      const m = libelle.match(/(\d{4}) (.+)$/);
+      if (m) { npa = m[1]; commune = m[2].replace(/ [A-Z]{2}$/, ''); }
+      const c = detail.match(/ ch ([a-z]{2})$/); if (c) canton = c[1].toUpperCase();
+    } else if (a.origin === 'gg25') {
+      // commune : label « Carouge (GE) », detail « carouge ge »
+      const m = libelle.match(/^(.+?)(?: \(([A-Z]{2})\))?$/);
+      if (m) { commune = m[1]; canton = m[2] || ''; }
+      if (!canton) { const c = detail.match(/ ([a-z]{2})$/); if (c) canton = c[1].toUpperCase(); }
+    } else if (a.origin === 'zipcode') {
+      // NPA : label « 1204 - Genève »
+      const m = libelle.match(/^(\d{4}) - (.+)$/);
+      if (m) { npa = m[1]; commune = m[2]; }
+    }
+    return { libelle, lon: Number(a.lon), lat: Number(a.lat), commune, canton, npa, type: a.origin === 'address' ? 'adresse' : a.origin === 'gg25' ? 'commune' : 'npa' };
   }).filter(x => Number.isFinite(x.lon) && Number.isFinite(x.lat));
 }
 
@@ -1841,7 +1849,8 @@ function afficherResultats(liste) {
   ul.style.display = liste.length ? 'block' : 'none';
 }
 
-async function rechercherAdresse() {
+// auto : adresse venue du RFP ou de l'URL ; on ouvre directement la première adresse exacte proposée
+async function rechercherAdresse({ auto = false } = {}) {
   const q = $('#adresse').value.trim();
   if (!q) { $('#adresse').focus(); return; }
   if (!app.pret) { toast('La carte se charge encore.', 'alerte'); return; }
@@ -1849,7 +1858,7 @@ async function rechercherAdresse() {
     occupe(true, 'Recherche de l\'adresse…');
     const liste = await geocoder(q);
     if (!liste.length) { toast('Adresse introuvable. Essayez avec le NPA, ou collez « lat, lon » depuis une carte.', 'erreur'); return; }
-    if (liste.length === 1) ouvrirLieu(liste[0]);
+    if (liste.length === 1 || (auto && liste[0].type !== 'commune' && liste[0].type !== 'npa')) ouvrirLieu(liste[0]);
     else afficherResultats(liste);
   } catch (e) {
     toast(e.message, 'erreur', 7000);
@@ -2239,7 +2248,7 @@ async function chargerRfp() {
     if (meta.adresse) {
       $('#adresse').value = meta.adresse;
       toast('Aucune carte enregistrée pour ce RFP : ouverture de son adresse.');
-      await rechercherAdresse();
+      await rechercherAdresse({ auto: true });
     } else {
       toast('Aucune carte enregistrée pour ce RFP : saisissez l\'adresse.');
       $('#adresse').focus();
@@ -2454,7 +2463,7 @@ async function demarrer() {
   if (!app.map) return;
   const suite = () => {
     if (p.get('rfp')) chargerRfp();
-    else if (p.get('adresse')) rechercherAdresse();
+    else if (p.get('adresse')) rechercherAdresse({ auto: true });
   };
   if (app.pret) suite(); else app.map.once('load', suite);
 }
