@@ -47,7 +47,7 @@
   #fiche .sous { color: var(--doux); margin-bottom: 10px; }
   #fiche dl { display: grid; grid-template-columns: 110px 1fr; gap: 4px 10px; margin: 0 0 12px; }
   #fiche dt { color: var(--doux); }
-  #fiche dd { margin: 0; overflow-wrap: anywhere; }
+  #fiche dd { margin: 0; overflow-wrap: anywhere; white-space: pre-line; }
   #fiche .item { border-top: 1px solid var(--ligne); padding: 8px 0; display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
   #fiche .item:first-of-type { border-top: 0; }
   #fiche .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
@@ -64,21 +64,21 @@
   #fiche .extrait iframe { display: block; width: 100%; height: 300px; border: 1px solid var(--ligne); border-radius: 8px; background: #fff; }
   #fiche .extrait a { font-size: 12px; color: var(--bleu); }
   /* Saisie d'un propriétaire (GE) : envoyée à n8n (CM-SRC-04), jamais affichée sur la carte */
-  #dlgProprio { border: 0; border-radius: 12px; box-shadow: var(--ombre); padding: 18px 20px; width: min(440px, calc(100vw - 24px)); color: var(--texte); }
-  #dlgProprio::backdrop { background: rgba(29, 31, 41, .35); }
-  #dlgProprio h2 { margin: 0 0 2px; font-size: 17px; color: var(--bleu); }
-  #dlgProprio .sous { color: var(--doux); font-size: 13px; margin-bottom: 12px; }
-  #dlgProprio label { display: block; font-size: 12px; color: var(--doux); margin: 10px 0 3px; }
-  #dlgProprio input, #dlgProprio select, #dlgProprio textarea { width: 100%; font: inherit; padding: 7px 9px; border: 1px solid var(--ligne); border-radius: 8px; background: #fff; color: var(--texte); }
-  #dlgProprio textarea { resize: vertical; min-height: 58px; }
-  #dlgProprio .deux { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
-  #dlgProprio .note { font-size: 12px; color: var(--doux); margin: 12px 0 0; }
-  #dlgProprio .message { font-size: 13px; margin: 10px 0 0; min-height: 18px; }
-  #dlgProprio .message.erreur { color: var(--rouge); }
-  #dlgProprio .boutons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
-  #dlgProprio .boutons button { height: 34px; padding: 0 14px; border-radius: 17px; border: 1px solid var(--ligne); background: #fff; color: var(--bleu); }
-  #dlgProprio .boutons .principal { background: var(--bleu); border-color: var(--bleu); color: #fff; }
-  #dlgProprio .boutons button:disabled { opacity: .6; cursor: wait; }
+  .dlg { border: 0; border-radius: 12px; box-shadow: var(--ombre); padding: 18px 20px; width: min(440px, calc(100vw - 24px)); color: var(--texte); }
+  .dlg::backdrop { background: rgba(29, 31, 41, .35); }
+  .dlg h2 { margin: 0 0 2px; font-size: 17px; color: var(--bleu); }
+  .dlg .sous { color: var(--doux); font-size: 13px; margin-bottom: 12px; }
+  .dlg label { display: block; font-size: 12px; color: var(--doux); margin: 10px 0 3px; }
+  .dlg input, .dlg select, .dlg textarea { width: 100%; font: inherit; padding: 7px 9px; border: 1px solid var(--ligne); border-radius: 8px; background: #fff; color: var(--texte); }
+  .dlg textarea { resize: vertical; min-height: 58px; }
+  .dlg .deux { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+  .dlg .note { font-size: 12px; color: var(--doux); margin: 12px 0 0; }
+  .dlg .message { font-size: 13px; margin: 10px 0 0; min-height: 18px; }
+  .dlg .message.erreur { color: var(--rouge); }
+  .dlg .boutons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+  .dlg .boutons button { height: 34px; padding: 0 14px; border-radius: 17px; border: 1px solid var(--ligne); background: #fff; color: var(--bleu); }
+  .dlg .boutons .principal { background: var(--bleu); border-color: var(--bleu); color: #fff; }
+  .dlg .boutons button:disabled { opacity: .6; cursor: wait; }
 
   /* Bulle au survol */
   #bulle { position: absolute; z-index: 6; pointer-events: none; background: var(--texte); color: #fff; padding: 6px 10px; border-radius: 8px; font-size: 13px;
@@ -140,7 +140,7 @@
 </div>
 <div id="toast" hidden></div>
 
-<dialog id="dlgProprio" aria-labelledby="dlgTitre">
+<dialog id="dlgProprio" class="dlg" aria-labelledby="dlgTitre">
   <form id="formProprio" method="dialog" novalidate>
     <h2 id="dlgTitre">Enregistrer le propriétaire</h2>
     <div class="sous" id="dlgParcelle"></div>
@@ -153,9 +153,14 @@
           <option value="">Choisir…</option>
           <option value="personne_physique">Personne physique</option>
           <option value="societe">Société</option>
-          <option value="ppe">Copropriété (PPE)</option>
+          <option value="fonds_immobilier">Fonds immobilier</option>
           <option value="fondation_caisse">Fondation / caisse de pension</option>
+          <option value="cooperative">Coopérative</option>
+          <option value="ppe">Copropriété (PPE)</option>
+          <option value="institution_religieuse">Institution religieuse</option>
+          <option value="association">Association</option>
           <option value="collectivite">Collectivité publique</option>
+          <option value="mixte">Mixte</option>
           <option value="autre">Autre</option>
         </select>
       </div>
@@ -189,6 +194,20 @@
     <div class="boutons">
       <button type="button" id="fpAnnuler">Annuler</button>
       <button type="submit" class="principal" id="fpEnvoyer">Enregistrer</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgCode" class="dlg" aria-labelledby="dlgCodeTitre">
+  <form id="formCode" method="dialog" novalidate>
+    <h2 id="dlgCodeTitre">Base propriétaires</h2>
+    <div class="sous">Propriétaires enregistrés (saisies depuis la carte et import Popety), réservés à l'équipe.</div>
+    <label for="fcCode">Code d'équipe (le même que pour l'éditeur de carte) *</label>
+    <input id="fcCode" type="password" autocomplete="off">
+    <p class="message" id="fcMessage" role="status"></p>
+    <div class="boutons">
+      <button type="button" id="fcAnnuler">Annuler</button>
+      <button type="submit" class="principal" id="fcValider">Afficher</button>
     </div>
   </form>
 </dialog>
@@ -279,8 +298,8 @@ const CONFIG = {
   RESULTATS_MAX: 30,
   // n8n CM-SRC-04 : enregistre un propriétaire saisi à la main (Header Auth X-SPG-Code, code d'équipe de l'éditeur)
   WEBHOOK_PROPRIETAIRE: 'https://leonka.app.n8n.cloud/webhook/carte-proprietaire',
-  COULEURS: { trait: '#8C2F39', survol: '#003B5C', selection: '#E4002B', numero: '#6B1F2A', halo: '#FFFFFF' },
-  COULEURS_SATELLITE: { trait: '#FFD166', survol: '#FFFFFF', selection: '#FF3B5C', numero: '#FFFFFF', halo: '#1D1F29' }
+  COULEURS: { trait: '#8C2F39', survol: '#003B5C', selection: '#E4002B', numero: '#6B1F2A', halo: '#FFFFFF', connu: '#0E9F4F' },
+  COULEURS_SATELLITE: { trait: '#FFD166', survol: '#FFFFFF', selection: '#FF3B5C', numero: '#FFFFFF', halo: '#1D1F29', connu: '#3DFF8F' }
 };
 
 const $ = s => document.querySelector(s);
@@ -343,6 +362,103 @@ async function chargerRegbl(egrid) {
   }
   // Fiche toujours sur cette parcelle : on la complète
   if (selection.size === 1 && [...selection.values()][0].properties.EGRID === egrid) afficherFiche();
+}
+// Base propriétaires CM (Data table cm_proprietaires_ge, via le webhook CM-SRC-04, avec le code d'équipe).
+// Les noms ne sont jamais dans la page : demandés à n8n parcelle par parcelle, à l'ouverture de la fiche.
+let connus = null;                 // EGRID → 'm' (saisie depuis la carte) | 'p' (import Popety) ; null = base non chargée
+let clesConnues = new Set();       // parcelles affichées avec le contour vert
+const baseCM = new Map();          // EGRID → { etat: 'charge' | 'ok' | 'aucun' | 'erreur', p, message }
+const TYPES_PROPRIO = { personne_physique: 'Personne physique', societe: 'Société', fonds_immobilier: 'Fonds immobilier',
+  fondation_caisse: 'Fondation / caisse de pension', cooperative: 'Coopérative', ppe: 'Copropriété (PPE)',
+  institution_religieuse: 'Institution religieuse', association: 'Association', collectivite: 'Collectivité publique', mixte: 'Mixte', autre: 'Autre' };
+const SOURCES_PROPRIO = { extrait_foncier: 'Extrait foncier', fao: 'Avis FAO', autre: 'Autre', popety: 'Popety' };
+const dateFr = d => /^\d{4}-\d{2}-\d{2}$/.test(String(d || '')) ? String(d).split('-').reverse().join('.') : (d || '');
+// Appel authentifié du webhook CM-SRC-04 ; erreur lisible sinon (e.code = 'code' si le code d'équipe est refusé)
+async function appelerBase(corps, code = local.get('spg_carte_code')) {
+  if (!code) { const e = new Error('Code d\'équipe manquant.'); e.code = 'code'; throw e; }
+  const ctrl = new AbortController();
+  const minuterie = setTimeout(() => ctrl.abort(), 30000);
+  let r;
+  try {
+    r = await fetch(CONFIG.WEBHOOK_PROPRIETAIRE, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-SPG-Code': code }, body: JSON.stringify(corps), signal: ctrl.signal
+    });
+  } catch (err) {
+    throw new Error(err.name === 'AbortError' ? 'n8n n\'a pas répondu à temps.' : 'n8n injoignable (workflow CM-SRC-04 non publié ou réglage CORS).');
+  } finally {
+    clearTimeout(minuterie);
+  }
+  if (r.status === 401 || r.status === 403) { const e = new Error('Code d\'équipe refusé.'); e.code = 'code'; throw e; }
+  if (r.status === 404) throw new Error('Webhook introuvable : le workflow CM-SRC-04 n\'est pas publié.');
+  let j = null;
+  try { j = await r.json(); } catch { /* réponse illisible */ }
+  if (!r.ok || !j) throw new Error(`Réponse inattendue de n8n (HTTP ${r.status}).`);
+  if (!j.ok) throw new Error(j.erreur || 'Requête refusée par n8n.');
+  return j;
+}
+function oublierCode() {
+  local.del('spg_carte_code');
+  connus = null;
+  baseCM.clear();
+  majSource();
+  if (selection.size) afficherFiche();
+}
+// Liste des EGRID au propriétaire connu (sans nom) → contour vert
+async function chargerConnus(code) {
+  const j = await appelerBase({ action: 'connus' }, code);
+  connus = new Map(Object.entries(j.connus || {}));
+  baseCM.clear();
+  majSource();
+  if (carte) etatParcelles();
+  if (selection.size) afficherFiche();
+}
+// Propriétaire enregistré d'une parcelle (fiche)
+async function lireBase(egrid) {
+  if (baseCM.has(egrid)) return;
+  if (connus && !connus.has(egrid)) { baseCM.set(egrid, { etat: 'aucun' }); return; }
+  baseCM.set(egrid, { etat: 'charge' });
+  try {
+    const j = await appelerBase({ action: 'lire', egrid });
+    baseCM.set(egrid, j.trouve && j.proprietaire ? { etat: 'ok', p: j.proprietaire } : { etat: 'aucun' });
+  } catch (e) {
+    if (e.code === 'code') return oublierCode();
+    baseCM.set(egrid, { etat: 'erreur', message: e.message });
+  }
+  if (selection.size === 1 && [...selection.values()][0].properties.EGRID === egrid) afficherFiche();
+}
+function ouvrirDialogueCode() {
+  $('#formCode').reset();
+  $('#fcMessage').textContent = '';
+  $('#fcMessage').classList.remove('erreur');
+  $('#fcValider').disabled = false;
+  $('#dlgCode').showModal();
+  $('#fcCode').focus();
+}
+async function validerCode(e) {
+  e.preventDefault();
+  const code = $('#fcCode').value.trim();
+  const m = $('#fcMessage');
+  if (!code) { m.textContent = 'Indiquez le code d\'équipe.'; m.classList.add('erreur'); return; }
+  $('#fcValider').disabled = true;
+  m.textContent = 'Vérification…';
+  m.classList.remove('erreur');
+  try {
+    await chargerConnus(code);
+    local.set('spg_carte_code', code);
+    $('#dlgCode').close();
+    if (selection.size) afficherFiche();
+    toast(`Base propriétaires chargée : ${connus.size.toLocaleString('fr-CH')} parcelle${connus.size > 1 ? 's' : ''} au propriétaire connu.`, 4000);
+  } catch (err) {
+    m.textContent = err.message;
+    m.classList.add('erreur');
+  } finally {
+    $('#fcValider').disabled = false;
+  }
+}
+function demarrerBaseProprio() {
+  $('#formCode').addEventListener('submit', validerCode);
+  $('#fcAnnuler').addEventListener('click', () => $('#dlgCode').close());
+  if (local.get('spg_carte_code')) chargerConnus().catch(e => { console.warn('Base propriétaires', e); if (e.code === 'code') oublierCode(); });
 }
 const texteRegbl = r => {
   if (!r || r.etat === 'charge') return 'recherche…';
@@ -598,12 +714,19 @@ function majSource() {
   nbAffichees = vues.size;
   src.setData({ type: 'FeatureCollection', features: [...vues.values()] });
   for (const k of selection.keys()) etatF(k, { sel: true });
+  // Contour vert des parcelles au propriétaire connu (réappliqué à chaque mise à jour et après un changement de fond)
+  const nouvelles = new Set();
+  if (connus) for (const f of vues.values()) if (f.properties.EGRID && connus.has(f.properties.EGRID)) nouvelles.add(f.properties.cle);
+  for (const k of clesConnues) if (!nouvelles.has(k)) etatF(k, { connu: false });
+  for (const k of nouvelles) etatF(k, { connu: true });
+  clesConnues = nouvelles;
 }
 function etat(msg, alerte = false) { const e = $('#etat'); e.textContent = msg; e.classList.toggle('alerte', alerte); }
 function etatParcelles() {
   if (carte.getZoom() < CONFIG.ZOOM_MIN) return etat('Zoomez pour afficher les parcelles.');
   if (!sourcesPour(boiteVue()).length) return etat('Hors de Suisse : pas de cadastre ici.', true);
-  etat(nbAffichees ? `${nbAffichees.toLocaleString('fr-CH')} parcelles · survolez pour le numéro, cliquez pour la fiche` : 'Aucune parcelle dans cette vue');
+  etat(nbAffichees ? `${nbAffichees.toLocaleString('fr-CH')} parcelles · survolez pour le numéro, cliquez pour la fiche`
+    + (clesConnues.size ? ` · ${clesConnues.size.toLocaleString('fr-CH')} au propriétaire connu (contour vert)` : '') : 'Aucune parcelle dans cette vue');
 }
 
 /* ---------- couches ---------- */
@@ -620,15 +743,16 @@ function poserCouches() {
     paint: { 'fill-color': ['case', etatBool('sel'), C.selection, etatBool('survol'), C.survol, '#ffffff'],
              'fill-opacity': ['case', etatBool('sel'), 0.22, etatBool('survol'), 0.16, 0.01] } });
   carte.addLayer({ id: 'parcelles-trait', type: 'line', source: 'parcelles', slot: 'middle', layout: { 'line-join': 'round' },
-    paint: { 'line-color': ['case', etatBool('sel'), C.selection, etatBool('survol'), C.survol, C.trait],
+    // Contour vert : propriétaire connu dans la base CM (cm_proprietaires_ge), visible avec le code d'équipe
+    paint: { 'line-color': ['case', etatBool('sel'), C.selection, etatBool('survol'), C.survol, etatBool('connu'), C.connu, C.trait],
              // Mapbox : ['zoom'] doit être l'entrée d'un interpolate de premier niveau (sinon la couche est refusée)
              'line-width': ['interpolate', ['linear'], ['zoom'],
-               15, ['case', etatBool('sel'), 2.5, etatBool('survol'), 2, 0.5],
-               17, ['case', etatBool('sel'), 3, etatBool('survol'), 2.5, 1],
-               19, ['case', etatBool('sel'), 3.5, etatBool('survol'), 3, 1.6]],
+               15, ['case', etatBool('sel'), 2.5, etatBool('survol'), 2, etatBool('connu'), 1.6, 0.5],
+               17, ['case', etatBool('sel'), 3, etatBool('survol'), 2.5, etatBool('connu'), 2.2, 1],
+               19, ['case', etatBool('sel'), 3.5, etatBool('survol'), 3, etatBool('connu'), 2.8, 1.6]],
              'line-opacity': ['interpolate', ['linear'], ['zoom'],
-               15, ['case', etatBool('sel'), 1, etatBool('survol'), 1, 0.55],
-               17, ['case', etatBool('sel'), 1, etatBool('survol'), 1, 0.85]] } });
+               15, ['case', etatBool('sel'), 1, etatBool('survol'), 1, etatBool('connu'), 1, 0.55],
+               17, ['case', etatBool('sel'), 1, etatBool('survol'), 1, etatBool('connu'), 1, 0.85]] } });
   carte.addLayer({ id: 'parcelles-numeros', type: 'symbol', source: 'parcelles', slot: 'middle', minzoom: CONFIG.ZOOM_NUMEROS,
     layout: { 'text-field': ['to-string', ['get', 'NO_PARCELLE']], 'text-size': ['interpolate', ['linear'], ['zoom'], 17.5, 10, 20, 13],
               'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'], 'text-allow-overlap': false, 'text-padding': 1 },
@@ -649,7 +773,8 @@ function brancherInteractions() {
       const p = f.properties;
       bulle.innerHTML = '';
       const s = document.createElement('strong'); s.textContent = `Parcelle ${p.NO_PARCELLE ?? '?'}`;
-      const d = document.createElement('span'); d.textContent = ` · ${[communeDe(p), p.CANTON].filter(Boolean).join(' · ')} · ${surfaceDe(p)}` + (proprioPublic(p) ? ` · ${proprioPublic(p)}` : '');
+      const d = document.createElement('span'); d.textContent = ` · ${[communeDe(p), p.CANTON].filter(Boolean).join(' · ')} · ${surfaceDe(p)}` + (proprioPublic(p) ? ` · ${proprioPublic(p)}` : '')
+        + (connus && connus.has(p.EGRID) ? ' · propriétaire connu' : '');
       bulle.append(s, d);
     }
     bulle.style.left = e.point.x + 'px';
@@ -730,8 +855,23 @@ function afficherFiche() {
     ligne('Surface', surfaceDe(p));
     if (p.INTEGRALITE && p.INTEGRALITE !== 'complet') ligne('Mensuration', p.INTEGRALITE);
     ligne('Type d\'immeuble', p.TYPE_PROPRI);
+    const avecCode = !!local.get('spg_carte_code');
+    if (aExtraitGe(p) && p.EGRID && avecCode && !baseCM.has(p.EGRID)) lireBase(p.EGRID);
+    const b = avecCode && p.EGRID ? baseCM.get(p.EGRID) : null;
     if (proprioPublic(p)) ligne('Propriétaire', `${proprioPublic(p)} (collectivité publique)`);
-    else if (aExtraitGe(p)) ligne('Propriétaire', 'Non public · nom au registre foncier');
+    // « Non public » inutile quand la base CM donne déjà le propriétaire
+    else if (aExtraitGe(p) && !(b && b.etat === 'ok')) ligne('Propriétaire', 'Non public · nom au registre foncier');
+    if (aExtraitGe(p) && p.EGRID && avecCode) {
+      if (!b || b.etat === 'charge') ligne('Base CM', 'recherche…');
+      else if (b.etat === 'aucun') ligne('Base CM', 'aucun propriétaire enregistré');
+      else if (b.etat === 'erreur') ligne('Base CM', `indisponible : ${b.message}`);
+      else {
+        ligne('Propriétaire (base CM)', b.p.proprietaires);
+        ligne('Catégorie', TYPES_PROPRIO[b.p.type_proprietaire] || b.p.type_proprietaire);
+        ligne('Source', [SOURCES_PROPRIO[b.p.source] || b.p.source, dateFr(b.p.date_info), b.p.saisi_par].filter(Boolean).join(' · '));
+        ligne('Remarque', b.p.remarque);
+      }
+    }
     if (p.EGRID) {
       if (!regbl.has(p.EGRID)) chargerRegbl(p.EGRID);
       const r = regbl.get(p.EGRID);
@@ -744,6 +884,7 @@ function afficherFiche() {
       const ouvert = !!extrait;
       bouton(ouvert ? 'Masquer le propriétaire' : 'Voir le propriétaire', () => { if (extrait) fermerExtrait(); else ouvrirExtrait(p); afficherFiche(); }, !ouvert);
       bouton('Enregistrer le propriétaire', () => ouvrirFormulaireProprio(p), ouvert);
+      if (!avecCode) bouton('Afficher la base propriétaires', ouvrirDialogueCode);
     }
     lienFoncier(p);
     if (p.EGRID) bouton('Copier l\'EGRID', () => copier(p.EGRID, 'EGRID copié.'));
@@ -850,6 +991,14 @@ async function envoyerProprio(e) {
   local.set('spg_carte_code', code);
   local.set('spg_carte_initiales', ini);
   $('#dlgProprio').close();
+  // La fiche et le contour reflètent tout de suite la saisie (une saisie depuis la carte prime sur Popety)
+  const saisie = { etat: 'ok', p: { proprietaires: noms, type_proprietaire: corps.type_proprietaire, source: corps.source,
+    date_info: corps.date_info, saisi_par: ini.toUpperCase(), remarque: corps.remarque } };
+  const appliquer = () => { connus.set(p.EGRID, 'm'); baseCM.set(p.EGRID, saisie); majSource(); if (carte) etatParcelles(); if (selection.size) afficherFiche(); };
+  baseCM.set(p.EGRID, saisie);
+  if (connus) appliquer();
+  else chargerConnus().then(appliquer).catch(e => console.warn('Base propriétaires', e));
+  afficherFiche();
   const lg = Number.isFinite(j.nb_logements) ? ` · ${j.nb_logements} logement${j.nb_logements > 1 ? 's' : ''}` : '';
   toast(`Propriétaire enregistré (parcelle ${p.NO_PARCELLE}${lg}).`, 4000);
 }
@@ -1036,8 +1185,9 @@ function demarrer() {
   if (['fr', 'en'].includes(q.get('langue'))) frag.set('langue', q.get('langue'));
   if ([...frag].length) $('#versEditeur').href = '../editeur/#' + frag.toString();
   // Échap ferme la fiche, sauf dans la recherche ou dans le formulaire propriétaire (qui se ferme seul)
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.activeElement !== $('#q') && !$('#dlgProprio').open) viderSelection(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.activeElement !== $('#q') && !document.querySelector('dialog[open]')) viderSelection(); });
   brancherFormulaireProprio();
+  demarrerBaseProprio();
   document.addEventListener('click', e => { if (!e.target.closest('.recherche')) $('#resultats').hidden = true; });
 }
 demarrer();
