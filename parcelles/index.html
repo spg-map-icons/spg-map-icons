@@ -63,6 +63,22 @@
   #fiche .extrait-titre { font-size: 12px; color: var(--doux); margin-bottom: 4px; }
   #fiche .extrait iframe { display: block; width: 100%; height: 300px; border: 1px solid var(--ligne); border-radius: 8px; background: #fff; }
   #fiche .extrait a { font-size: 12px; color: var(--bleu); }
+  /* Saisie d'un propriétaire (GE) : envoyée à n8n (CM-SRC-04), jamais affichée sur la carte */
+  #dlgProprio { border: 0; border-radius: 12px; box-shadow: var(--ombre); padding: 18px 20px; width: min(440px, calc(100vw - 24px)); color: var(--texte); }
+  #dlgProprio::backdrop { background: rgba(29, 31, 41, .35); }
+  #dlgProprio h2 { margin: 0 0 2px; font-size: 17px; color: var(--bleu); }
+  #dlgProprio .sous { color: var(--doux); font-size: 13px; margin-bottom: 12px; }
+  #dlgProprio label { display: block; font-size: 12px; color: var(--doux); margin: 10px 0 3px; }
+  #dlgProprio input, #dlgProprio select, #dlgProprio textarea { width: 100%; font: inherit; padding: 7px 9px; border: 1px solid var(--ligne); border-radius: 8px; background: #fff; color: var(--texte); }
+  #dlgProprio textarea { resize: vertical; min-height: 58px; }
+  #dlgProprio .deux { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+  #dlgProprio .note { font-size: 12px; color: var(--doux); margin: 12px 0 0; }
+  #dlgProprio .message { font-size: 13px; margin: 10px 0 0; min-height: 18px; }
+  #dlgProprio .message.erreur { color: var(--rouge); }
+  #dlgProprio .boutons { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+  #dlgProprio .boutons button { height: 34px; padding: 0 14px; border-radius: 17px; border: 1px solid var(--ligne); background: #fff; color: var(--bleu); }
+  #dlgProprio .boutons .principal { background: var(--bleu); border-color: var(--bleu); color: #fff; }
+  #dlgProprio .boutons button:disabled { opacity: .6; cursor: wait; }
 
   /* Bulle au survol */
   #bulle { position: absolute; z-index: 6; pointer-events: none; background: var(--texte); color: #fff; padding: 6px 10px; border-radius: 8px; font-size: 13px;
@@ -124,6 +140,59 @@
 </div>
 <div id="toast" hidden></div>
 
+<dialog id="dlgProprio" aria-labelledby="dlgTitre">
+  <form id="formProprio" method="dialog" novalidate>
+    <h2 id="dlgTitre">Enregistrer le propriétaire</h2>
+    <div class="sous" id="dlgParcelle"></div>
+    <label for="fpNoms">Propriétaire(s), un par ligne *</label>
+    <textarea id="fpNoms" maxlength="1000" required placeholder="Tel qu'indiqué sur l'extrait foncier ou l'avis FAO"></textarea>
+    <div class="deux">
+      <div>
+        <label for="fpType">Type *</label>
+        <select id="fpType" required>
+          <option value="">Choisir…</option>
+          <option value="personne_physique">Personne physique</option>
+          <option value="societe">Société</option>
+          <option value="ppe">Copropriété (PPE)</option>
+          <option value="fondation_caisse">Fondation / caisse de pension</option>
+          <option value="collectivite">Collectivité publique</option>
+          <option value="autre">Autre</option>
+        </select>
+      </div>
+      <div>
+        <label for="fpSource">Source *</label>
+        <select id="fpSource" required>
+          <option value="extrait_foncier">Extrait foncier</option>
+          <option value="fao">Avis FAO</option>
+          <option value="autre">Autre</option>
+        </select>
+      </div>
+    </div>
+    <div class="deux">
+      <div>
+        <label for="fpDate">Date de l'information *</label>
+        <input id="fpDate" type="date" required>
+      </div>
+      <div id="fpInitialesBloc">
+        <label for="fpInitiales">Vos initiales *</label>
+        <input id="fpInitiales" maxlength="12" autocomplete="off">
+      </div>
+    </div>
+    <div id="fpCodeBloc">
+      <label for="fpCode">Code d'équipe (le même que pour l'éditeur de carte) *</label>
+      <input id="fpCode" type="password" autocomplete="off">
+    </div>
+    <label for="fpRemarque">Remarque</label>
+    <textarea id="fpRemarque" maxlength="500"></textarea>
+    <p class="note">Enregistré dans la base Capital Markets (n8n). Le nom n'est jamais affiché sur la carte.</p>
+    <p class="message" id="fpMessage" role="status"></p>
+    <div class="boutons">
+      <button type="button" id="fpAnnuler">Annuler</button>
+      <button type="submit" class="principal" id="fpEnvoyer">Enregistrer</button>
+    </div>
+  </form>
+</dialog>
+
 <script>
 'use strict';
 /* =====================================================================
@@ -139,6 +208,8 @@
    Propriétaires (GE seulement) : collectivités publiques via le champ PROPRI_PUBLIQUE du SITG (bulle, fiche, liste) ;
    propriétaires privés : la page officielle de l'extrait foncier s'affiche dans la fiche sur le bouton « Voir le propriétaire »,
    une parcelle à la fois. La carte ne lit ni ne stocke le nom (registre protégé contre la consultation en série).
+   « Enregistrer le propriétaire » : saisie humaine envoyée au webhook n8n CM-SRC-04 (Data table cm_proprietaires_ge),
+   jamais réaffichée ici. Fiche : logements et adresse du RegBL (geo.admin) pour repérer les immeubles de rendement.
    ===================================================================== */
 const nombre = v => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v))) ? null : Number(v);
 const SUISSE = [5.9, 45.8, 10.6, 47.9];
@@ -206,6 +277,8 @@ const CONFIG = {
   CENTRE: [6.1466, 46.2033],
   ZOOM: 16.5,
   RESULTATS_MAX: 30,
+  // n8n CM-SRC-04 : enregistre un propriétaire saisi à la main (Header Auth X-SPG-Code, code d'équipe de l'éditeur)
+  WEBHOOK_PROPRIETAIRE: 'https://leonka.app.n8n.cloud/webhook/carte-proprietaire',
   COULEURS: { trait: '#8C2F39', survol: '#003B5C', selection: '#E4002B', numero: '#6B1F2A', halo: '#FFFFFF' },
   COULEURS_SATELLITE: { trait: '#FFD166', survol: '#FFFFFF', selection: '#FF3B5C', numero: '#FFFFFF', halo: '#1D1F29' }
 };
@@ -238,6 +311,45 @@ const proprioPublic = p => p.PROPRI_PUBLIQUE ? (LIBELLES_PUBLICS[p.PROPRI_PUBLIQ
 const aExtraitGe = p => p.SOURCE === 'GE' && typeof p.LIEN_WWW === 'string' && p.LIEN_WWW.startsWith('https://ge.ch/terextraitfoncier/');
 let extrait = null;                // extrait ouvert dans la fiche : { cle, el }
 function fermerExtrait() { if (extrait) { extrait.el.remove(); extrait = null; } }
+// Mémoire du navigateur partagée avec l'éditeur de carte (même site) : code d'équipe et initiales
+const local = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch { /* navigation privée */ } },
+  del(k) { try { localStorage.removeItem(k); } catch { /* idem */ } }
+};
+// RegBL (Office fédéral de la statistique, via geo.admin) : logements et adresses des bâtiments d'une parcelle,
+// pour repérer les immeubles de rendement (> 3 logements) avant de consulter l'extrait foncier
+const regbl = new Map();           // EGRID → { etat: 'charge' | 'ok' | 'erreur', logements, batiments, adresses }
+async function chargerRegbl(egrid) {
+  if (!egrid || regbl.has(egrid)) return;
+  regbl.set(egrid, { etat: 'charge' });
+  try {
+    const p = new URLSearchParams({ layer: 'ch.bfs.gebaeude_wohnungs_register', searchField: 'egrid', searchText: egrid, contains: 'false', returnGeometry: 'false' });
+    const j = await lireJson(`${GEOADMIN}/find?${p}`, 'RegBL');
+    const bats = new Map();      // une entrée de bâtiment = un résultat : dédoublonnage par EGID
+    for (const x of j.results || []) {
+      const a = x && x.attributes;
+      if (!a || String(a.egrid || '').toUpperCase() !== egrid) continue;
+      const cle = String(a.egid || x.featureId || '');
+      const b = bats.get(cle) || { logements: Number(a.ganzwhg) || 0, adresses: new Set() };
+      if (a.strname_deinr) b.adresses.add(String(a.strname_deinr));
+      bats.set(cle, b);
+    }
+    regbl.set(egrid, { etat: 'ok', batiments: bats.size, logements: [...bats.values()].reduce((t, b) => t + b.logements, 0),
+      adresses: [...new Set([...bats.values()].flatMap(b => [...b.adresses]))].join(' ; ') });
+  } catch (e) {
+    console.warn('RegBL', e);
+    regbl.set(egrid, { etat: 'erreur' });
+  }
+  // Fiche toujours sur cette parcelle : on la complète
+  if (selection.size === 1 && [...selection.values()][0].properties.EGRID === egrid) afficherFiche();
+}
+const texteRegbl = r => {
+  if (!r || r.etat === 'charge') return 'recherche…';
+  if (r.etat === 'erreur') return 'indisponible';
+  if (!r.batiments) return 'aucun bâtiment';
+  return `${r.logements.toLocaleString('fr-CH')} logement${r.logements > 1 ? 's' : ''} · ${r.batiments} bâtiment${r.batiments > 1 ? 's' : ''}`;
+};
 
 /* ---------- accès aux services ---------- */
 async function lireJson(url, service, opts) {
@@ -620,11 +732,18 @@ function afficherFiche() {
     ligne('Type d\'immeuble', p.TYPE_PROPRI);
     if (proprioPublic(p)) ligne('Propriétaire', `${proprioPublic(p)} (collectivité publique)`);
     else if (aExtraitGe(p)) ligne('Propriétaire', 'Non public · nom au registre foncier');
+    if (p.EGRID) {
+      if (!regbl.has(p.EGRID)) chargerRegbl(p.EGRID);
+      const r = regbl.get(p.EGRID);
+      ligne('Logements', texteRegbl(r));
+      if (r && r.etat === 'ok') ligne('Adresse', r.adresses);
+    }
     ligne('EGRID', p.EGRID);
     haut.append(h, s, dl);
     if (aExtraitGe(p)) {
       const ouvert = !!extrait;
       bouton(ouvert ? 'Masquer le propriétaire' : 'Voir le propriétaire', () => { if (extrait) fermerExtrait(); else ouvrirExtrait(p); afficherFiche(); }, !ouvert);
+      bouton('Enregistrer le propriétaire', () => ouvrirFormulaireProprio(p), ouvert);
     }
     lienFoncier(p);
     if (p.EGRID) bouton('Copier l\'EGRID', () => copier(p.EGRID, 'EGRID copié.'));
@@ -661,6 +780,82 @@ function ouvrirExtrait(p) {
   const a = document.createElement('a'); a.href = p.LIEN_WWW; a.target = '_blank'; a.rel = 'noopener'; a.textContent = 'Ouvrir dans un onglet';
   el.append(t, i, a);
   extrait = { cle: p.cle, el };
+}
+
+/* ---------- saisie d'un propriétaire (GE) → n8n CM-SRC-04 → Data table cm_proprietaires_ge ---------- */
+// Saisie humaine (lecture de l'extrait ou d'un avis FAO). La carte n'affiche jamais les noms enregistrés.
+let parcelleProprio = null;
+const aujourdhui = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+function messageProprio(txt, erreur = false) { const m = $('#fpMessage'); m.textContent = txt; m.classList.toggle('erreur', erreur); }
+function ouvrirFormulaireProprio(p) {
+  parcelleProprio = p;
+  $('#dlgParcelle').textContent = [`Parcelle ${p.NO_PARCELLE ?? '?'}`, communeDe(p), p.EGRID].filter(Boolean).join(' · ');
+  $('#formProprio').reset();
+  $('#fpSource').value = 'extrait_foncier';
+  $('#fpDate').value = aujourdhui();
+  $('#fpDate').max = aujourdhui();
+  $('#fpInitiales').value = local.get('spg_carte_initiales') || '';
+  $('#fpInitialesBloc').hidden = !!local.get('spg_carte_initiales');
+  $('#fpCodeBloc').hidden = !!local.get('spg_carte_code');
+  messageProprio('');
+  $('#fpEnvoyer').disabled = false;
+  $('#dlgProprio').showModal();
+  $('#fpNoms').focus();
+}
+async function envoyerProprio(e) {
+  e.preventDefault();
+  const p = parcelleProprio;
+  if (!p) return;
+  const noms = $('#fpNoms').value.split('\n').map(l => l.trim()).filter(Boolean).join('\n');
+  const ini = ($('#fpInitiales').value || local.get('spg_carte_initiales') || '').trim();
+  const code = String(($('#fpCodeBloc').hidden ? local.get('spg_carte_code') : $('#fpCode').value) || '').trim();
+  if (noms.length < 2) return messageProprio('Indiquez le nom du ou des propriétaires.', true);
+  if (!$('#fpType').value) return messageProprio('Choisissez le type de propriétaire.', true);
+  if (!$('#fpDate').value) return messageProprio('Indiquez la date de l\'information.', true);
+  if (!ini) { $('#fpInitialesBloc').hidden = false; return messageProprio('Indiquez vos initiales.', true); }
+  if (!code) { $('#fpCodeBloc').hidden = false; return messageProprio('Indiquez le code d\'équipe.', true); }
+  const corps = {
+    action: 'enregistrer', egrid: p.EGRID, no_comm: Number(p.NO_COMM), no_parcelle: Number(p.NO_PARCELLE), commune: communeDe(p) || '',
+    proprietaires: noms, type_proprietaire: $('#fpType').value, source: $('#fpSource').value, date_info: $('#fpDate').value,
+    remarque: $('#fpRemarque').value.trim(), par: ini
+  };
+  $('#fpEnvoyer').disabled = true;
+  messageProprio('Enregistrement…');
+  const ctrl = new AbortController();
+  const minuterie = setTimeout(() => ctrl.abort(), 30000);
+  let r;
+  try {
+    r = await fetch(CONFIG.WEBHOOK_PROPRIETAIRE, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-SPG-Code': code }, body: JSON.stringify(corps), signal: ctrl.signal
+    });
+  } catch (err) {
+    $('#fpEnvoyer').disabled = false;
+    return messageProprio(err.name === 'AbortError' ? 'n8n n\'a pas répondu à temps. Réessayez.'
+      : 'n8n injoignable : workflow CM-SRC-04 non publié ou réglage « Allowed Origins (CORS) ».', true);
+  } finally {
+    clearTimeout(minuterie);
+  }
+  $('#fpEnvoyer').disabled = false;
+  if (r.status === 401 || r.status === 403) {
+    local.del('spg_carte_code');
+    $('#fpCode').value = '';
+    $('#fpCodeBloc').hidden = false;
+    return messageProprio('Code d\'équipe refusé. Saisissez-le à nouveau.', true);
+  }
+  if (r.status === 404) return messageProprio('Webhook introuvable : le workflow CM-SRC-04 n\'est pas publié.', true);
+  let j = null;
+  try { j = await r.json(); } catch { /* réponse illisible */ }
+  if (!r.ok || !j) return messageProprio(`Réponse inattendue de n8n (HTTP ${r.status}).`, true);
+  if (!j.ok) return messageProprio(j.erreur || 'Enregistrement refusé.', true);
+  local.set('spg_carte_code', code);
+  local.set('spg_carte_initiales', ini);
+  $('#dlgProprio').close();
+  const lg = Number.isFinite(j.nb_logements) ? ` · ${j.nb_logements} logement${j.nb_logements > 1 ? 's' : ''}` : '';
+  toast(`Propriétaire enregistré (parcelle ${p.NO_PARCELLE}${lg}).`, 4000);
+}
+function brancherFormulaireProprio() {
+  $('#formProprio').addEventListener('submit', envoyerProprio);
+  $('#fpAnnuler').addEventListener('click', () => $('#dlgProprio').close());
 }
 // Parcelles sans nom de commune (geo.admin) : commune cherchée au point, parcelle par parcelle (30 au plus)
 async function completerCommunesDe(features, max = 30) {
@@ -840,7 +1035,9 @@ function demarrer() {
   if (/^[A-Za-z0-9_-]{1,40}$/.test(q.get('rfp') || '')) frag.set('rfp', q.get('rfp'));
   if (['fr', 'en'].includes(q.get('langue'))) frag.set('langue', q.get('langue'));
   if ([...frag].length) $('#versEditeur').href = '../editeur/#' + frag.toString();
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.activeElement !== $('#q')) viderSelection(); });
+  // Échap ferme la fiche, sauf dans la recherche ou dans le formulaire propriétaire (qui se ferme seul)
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.activeElement !== $('#q') && !$('#dlgProprio').open) viderSelection(); });
+  brancherFormulaireProprio();
   document.addEventListener('click', e => { if (!e.target.closest('.recherche')) $('#resultats').hidden = true; });
 }
 demarrer();
