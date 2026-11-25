@@ -340,6 +340,7 @@
     </div>
     <div class="panneau-pied">
       <button id="btnPreremplir" class="secondaire" type="button">Pré-remplir la carte</button>
+      <label class="case"><input id="prefillAuto" type="checkbox"> Pré-remplir dès qu'une adresse est ouverte</label>
       <label class="case"><input id="adapterCadrage" type="checkbox" checked> Adapter le cadrage au résultat</label>
       <label class="case"><input id="pinLibre" type="checkbox"> Pin du bien déplaçable</label>
       <label class="case"><input id="parcelleVisible" type="checkbox" checked> Mettre en évidence la parcelle</label>
@@ -1887,7 +1888,9 @@ async function rechercherAdresse({ auto = false } = {}) {
     occupe(true, 'Recherche de l\'adresse…');
     const liste = await geocoder(q);
     if (!liste.length) { toast('Adresse introuvable. Essayez avec le NPA, ou collez « lat, lon » depuis une carte.', 'erreur'); return; }
-    if (liste.length === 1 || (auto && liste[0].type !== 'commune' && liste[0].type !== 'npa')) ouvrirLieu(liste[0]);
+    // Recherche manuelle : toujours les propositions (adresse complète à confirmer : Entrée ou clic) ;
+    // adresse venue du RFP ou de l'URL : la première adresse exacte est ouverte directement.
+    if (auto && liste[0].type !== 'commune' && liste[0].type !== 'npa') ouvrirLieu(liste[0]);
     else afficherResultats(liste);
   } catch (e) {
     toast(e.message, 'erreur', 7000);
@@ -1896,7 +1899,10 @@ async function rechercherAdresse({ auto = false } = {}) {
   }
 }
 
-function ouvrirLieu(res, { preremplirAuto = true } = {}) {
+// Le pré-remplissage ne part plus tout seul (retour de Léon, 25.11) : bouton « Pré-remplir la carte »,
+// ou case « Pré-remplir dès qu'une adresse est ouverte » (choix gardé par le navigateur).
+const prefillAutoVoulu = () => local.get('spg_carte_prefill_auto') === '1';
+function ouvrirLieu(res, { preremplirAuto = prefillAutoVoulu() } = {}) {
   if (app.modifie && app.etat.marqueurs.length && !confirm('Ouvrir une autre adresse efface la carte en cours. Continuer ?')) return;
   const reglages = app.etat.reglages;
   app.etat = { ...nouvelEtat(), rfp_id: $('#rfp').value.trim().toUpperCase(), langue: $('#langue').value, reglages };
@@ -1909,6 +1915,7 @@ function ouvrirLieu(res, { preremplirAuto = true } = {}) {
   app.cadragePreremplissage = true;
   $('#lieu').textContent = '● ' + res.libelle;
   $('#lieu').title = res.libelle;
+  $('#adresse').value = res.libelle; // l'adresse complète retenue remplace le texte tapé
   cadrerSurRayon(res.lon, res.lat, reglages.rayon_m);
   redessiner();
   majParcelles();
@@ -1916,6 +1923,7 @@ function ouvrirLieu(res, { preremplirAuto = true } = {}) {
   majBoutons();
   chargerParcelleDuBien();
   if (preremplirAuto) preremplir();
+  else toast('Adresse ouverte. Cliquez sur « Pré-remplir la carte » pour placer les icônes.', '', 5000);
 }
 
 /* ---------- appels n8n ---------- */
@@ -2410,6 +2418,8 @@ function brancher() {
     if (app.selection === 'bien') majSelection();
   });
   $('#btnPreremplir').addEventListener('click', () => { basculerTiroir(false); preremplir(); });
+  $('#prefillAuto').checked = prefillAutoVoulu();
+  $('#prefillAuto').addEventListener('change', () => local.set('spg_carte_prefill_auto', $('#prefillAuto').checked ? '1' : '0'));
   $('#btnReglages').addEventListener('click', () => basculerTiroir());
   document.querySelectorAll('.segments [data-noms]').forEach(b => b.addEventListener('click', () => appliquerNoms(b.dataset.noms)));
   $('#voileTiroir').addEventListener('click', () => basculerTiroir(false));
