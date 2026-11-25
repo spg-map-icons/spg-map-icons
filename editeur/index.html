@@ -467,7 +467,7 @@ const CONFIG = {
   // Logos de marques : site protégé (Cloudflare Access), à la racine du dépôt privé spg-cartes.
   ICON_BASE_URL: 'https://spg-map-icons.github.io/spg-map-icons',
   LOGO_BASE_URL: '..',
-  ICON_VERSION: '2',              // = icon_version de RFP-08 (2 : cartouches v2 du 05.11, rouge + bleu)
+  ICON_VERSION: '3',              // = icon_version de RFP-08 (3 : « Immeuble vendu » du 25.11 ; 2 : cartouches v2 rouge + bleu)
   ICON_SCALE: 2,                  // PNG dessinés pour le rendu @2x : affichés à taille/2 à l'écran
   TAILLE: 760,                    // cadre CSS, identique au placeholder diap. 17
   ECHELLE_EXPORT: 2,              // @2x : image finale 1520 × 1520
@@ -497,6 +497,7 @@ const uid = () => 'm' + Math.random().toString(36).slice(2, 8) + Date.now().toSt
 const RE_CARTOUCHE = /^(ref_(?:vendu|advisory|letting)(?:_bleu)?(?:_fr)?)(_g|_b|_bg|_n)?$/;
 const RE_REF = /^ref_(vendu|advisory|letting)(_bleu)?(_fr)?(_g|_b|_bg|_n)?$/;
 const COULEURS_REF = ['rouge', 'bleu'];
+const LIBELLES_REF_FR = { vendu: 'Immeuble vendu', advisory: 'Mandat de conseil', letting: 'Location en cours' }; // 25.11 : « Immeuble vendu »
 const iconeRef = (icone, langue, couleur) => {
   const m = String(icone).match(RE_REF);
   return m ? `ref_${m[1]}${couleur === 'bleu' ? '_bleu' : ''}${langue === 'fr' ? '_fr' : ''}${m[4] || ''}` : icone;
@@ -713,6 +714,8 @@ function libellePalette(icone) {
   }
   const ref = icone.match(RE_REF);
   const base = ref ? `ref_${ref[1]}` : icone;
+  // cartouche français : libellé français (même texte que l'image)
+  if (ref && ref[3] === '_fr' && LIBELLES_REF_FR[ref[1]]) return LIBELLES_REF_FR[ref[1]];
   const p = (app.presets?.palette || []).find(x => x.icone === icone || x.icone === base);
   return p ? p.libelle : icone;
 }
@@ -1483,10 +1486,11 @@ const CATEGORIES_TRANSPORT = new Set(['autoroute', 'tram', 'gare', 'bus']);
 const categorieLieu = m => m.icone_origine || (estLogo(m.icone) ? '' : (m.categorie === 'reference_spg' ? '' : (m.categorie || m.icone)));
 // Un logo vaut pour un lieu si son nom contient un des mots du logo (mot entier), dans sa zone et ses catégories ;
 // les réseaux de transport (par_zone) valent pour tous les arrêts de leur zone. Le mot le plus long l'emporte (Coop City > Coop).
+// parLieuType : comment le logo a été reconnu — 'nom' (mot de l'enseigne), 'lignes' (gare) ou 'zone' (réseau de transport).
 function correspondancesLogos() {
-  const parLogo = new Map(), parLieu = new Map();
+  const parLogo = new Map(), parLieu = new Map(), parLieuType = new Map();
   const logos = (app.presets?.logos || []).filter(l => estLogo(l.fichier) && RE_ICONE.test(l.fichier));
-  if (!logos.length) return { parLogo, parLieu };
+  if (!logos.length) return { parLogo, parLieu, parLieuType };
   const canton = cantonCarte(), commune = normaliserTexte(app.etat.commune);
   for (const m of app.etat.marqueurs) {
     const cat = categorieLieu(m);
@@ -1513,10 +1517,35 @@ function correspondancesLogos() {
     }
     if (!meilleur) continue;
     parLieu.set(m.id, meilleur.fichier);
+    parLieuType.set(m.id, score >= 100 ? 'nom' : score >= 50 ? 'lignes' : 'zone');
     if (!parLogo.has(meilleur.fichier)) parLogo.set(meilleur.fichier, []);
     parLogo.get(meilleur.fichier).push(m.id);
   }
-  return { parLogo, parLieu };
+  return { parLogo, parLieu, parLieuType };
+}
+// Après le pré-remplissage (retour Capital Markets, 25.11) : les enseignes connues (Coop, Manor, Denner…) et la gare
+// reçoivent leur logo d'office ; les réseaux (tpg, tl…) restent au choix via « Poser tous les logos ».
+// Les commerces sans enseigne connue (« tutti.ch »…) sont retirés : un magasin inconnu n'apporte rien au pitch.
+const CATEGORIES_ENSEIGNES = new Set(['commerce']);
+function poserLogosAuto() {
+  const c = correspondancesLogos();
+  app.logosTrouves = c;
+  let logos = 0;
+  for (const m of app.etat.marqueurs) {
+    if (m.source !== 'auto') continue;
+    const fichier = c.parLieu.get(m.id), type = c.parLieuType.get(m.id);
+    // réseau (tpg, tl…) : pas d'office, sauf la gare, dont le logo (CFF, Léman Express) est toujours posé
+    if (!fichier || (type === 'zone' && categorieLieu(m) !== 'gare') || logoPose(m, fichier)) continue;
+    if (!m.icone_origine) m.icone_origine = m.icone;
+    m.icone = fichier;
+    m.type = 'logo';
+    m.etiquette = false; delete m.etiquette_pos;
+    delete m.taille;
+    logos++;
+  }
+  const avant = app.etat.marqueurs.length;
+  app.etat.marqueurs = app.etat.marqueurs.filter(m => !(m.source === 'auto' && CATEGORIES_ENSEIGNES.has(categorieLieu(m)) && !estLogo(m.icone)));
+  return { logos, inconnus: avant - app.etat.marqueurs.length };
 }
 const logoPose = (m, fichier) => !!m && m.icone === fichier && !!m.icone_origine;
 // Remplace l'icône du lieu par le logo (le lieu garde son nom, sa position et son lieu réel ; annulable).
@@ -1999,6 +2028,7 @@ async function preremplir() {
     const liste = brut.filter(marqueurValide).map(x => normaliserMarqueur({ ...x, icone: iconeEnStyle(x.icone) }, 'auto'));
     memoriser();
     app.etat.marqueurs = app.etat.marqueurs.filter(m => m.source !== 'auto').concat(liste);
+    const auto = app.presets ? poserLogosAuto() : { logos: 0, inconnus: 0 };
     redessiner();
     if (!app.etat.parcelles.length && Array.isArray(rep.parcelles)) {
       app.etat.parcelles = rep.parcelles.map(normaliserParcelle).filter(Boolean).slice(0, 1);
@@ -2010,7 +2040,11 @@ async function preremplir() {
     }
     marquerModifie();
     const ecartes = brut.length - liste.length;
-    toast(`${liste.length} icône${liste.length > 1 ? 's' : ''} placée${liste.length > 1 ? 's' : ''}${ecartes ? ` (${ecartes} ignorée${ecartes > 1 ? 's' : ''})` : ''}.`);
+    const placees = liste.length - auto.inconnus;
+    const details = [auto.logos ? `${auto.logos} logo${auto.logos > 1 ? 's' : ''} d'enseigne${auto.logos > 1 ? 's' : ''}` : '',
+      auto.inconnus ? `${auto.inconnus} magasin${auto.inconnus > 1 ? 's' : ''} sans enseigne connue retiré${auto.inconnus > 1 ? 's' : ''}` : '',
+      ecartes ? `${ecartes} ignorée${ecartes > 1 ? 's' : ''}` : ''].filter(Boolean);
+    toast(`${placees} icône${placees > 1 ? 's' : ''} placée${placees > 1 ? 's' : ''}${details.length ? ` (${details.join(', ')})` : ''}.`);
     for (const a of (Array.isArray(rep.avertissements) ? rep.avertissements : []).slice(0, 3)) toast(String(a), 'alerte', 7000);
   } catch (e) {
     toast(e.message, 'erreur', 8000);
